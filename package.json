@@ -1,0 +1,25 @@
+{
+  "name": "kodik-readme-ai",
+  "version": "1.0.0",
+  "description": "Автоматическая генерация README.md на основе анализа кодовой базы (без AI)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "readme",
+    "documentation",
+    "generator",
+    "template"
+  ],
+  "author": "GigaCode",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
