@@ -1,4 +1,4 @@
-log#!/usr/bin/env node
+#!/usr/bin/env node
 'use strict';
 /**
  * src/index.js — точка входа Kodik README AI.
