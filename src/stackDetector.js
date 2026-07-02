@@ -1,4 +1,5 @@
 'use strict';
+
 /**
  * src/stackDetector.js
  * Интеллектуальный анализ стека проекта по содержимому манифеста и дерева файлов.
@@ -16,7 +17,7 @@
  *     extras:          string[]                        // дополнительные технологии (TypeScript, ESLint, etc.)
  *   }
  */
-// ─── Хелперы ────────────────────────────────────────────────────────────────
+
 function safeJsonParse(text) {
   try {
     return JSON.parse(text.replace(/\n\.\.\. \(файл обрезан\)$/, ''));
@@ -24,10 +25,12 @@ function safeJsonParse(text) {
     return null;
   }
 }
+
 function includesAny(haystack, needles) {
   const lower = (haystack || '').toLowerCase();
   return needles.some((n) => lower.includes(n.toLowerCase()));
 }
+
 function hasFileWithExt(files, exts) {
   for (const f of files) {
     const lower = f.toLowerCase();
@@ -35,13 +38,15 @@ function hasFileWithExt(files, exts) {
   }
   return false;
 }
+
 // ─── Детекторы по манифестам ────────────────────────────────────────────────
+
 function detectFromPackageJson(content) {
   const pkg = safeJsonParse(content) || {};
   const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies, pkg.peerDependencies);
   const depNames = Object.keys(deps);
   const isTs = depNames.includes('typescript') || depNames.includes('ts-node');
-  // Определение фреймворка
+
   let framework = null;
   const fwMap = [
     ['next',           'Next.js'],
@@ -59,10 +64,9 @@ function detectFromPackageJson(content) {
   for (const [key, name] of fwMap) {
     if (depNames.includes(key)) { framework = name; break; }
   }
-  // Менеджер: смотрим на наличие lock-файлов в extras (передаём извне);
-  // по умолчанию — npm.
+
   const packageManager = 'npm';
-  // Команды установки / запуска
+
   const installCommands = ['npm install'];
   const runCommands = [];
   if (pkg.scripts && typeof pkg.scripts === 'object') {
@@ -74,12 +78,14 @@ function detectFromPackageJson(content) {
     const entry = (typeof pkg.main === 'string' && pkg.main) || 'index.js';
     runCommands.push(`node ${entry}`);
   }
+
   const extras = [];
   if (isTs) extras.push('TypeScript');
   if (depNames.includes('eslint')) extras.push('ESLint');
   if (depNames.includes('jest') || depNames.includes('vitest') || depNames.includes('mocha')) {
     extras.push('Testing');
   }
+
   return {
     language: isTs ? 'Node.js (TypeScript)' : 'Node.js (JavaScript)',
     framework,
@@ -90,6 +96,7 @@ function detectFromPackageJson(content) {
     extras,
   };
 }
+
 function detectFromRequirementsTxt(content) {
   const lower = content.toLowerCase();
   let framework = null;
@@ -98,6 +105,7 @@ function detectFromRequirementsTxt(content) {
   else if (lower.includes('fastapi')) framework = 'FastAPI';
   else if (lower.includes('aiohttp')) framework = 'aiohttp';
   else if (lower.includes('tornado')) framework = 'Tornado';
+
   return {
     language: 'Python',
     framework,
@@ -105,7 +113,6 @@ function detectFromRequirementsTxt(content) {
     requirements: ['Python 3.10+', 'pip'],
     installCommands: [
       'python -m venv .venv',
-      // Кроссплатформенно — оставим Linux/macOS вариант; Windows-вариант добавит AI.
       'source .venv/bin/activate',
       'pip install -r requirements.txt',
     ],
@@ -115,6 +122,7 @@ function detectFromRequirementsTxt(content) {
     extras: [],
   };
 }
+
 function detectFromPyprojectToml(content) {
   const lower = content.toLowerCase();
   const isPoetry = lower.includes('[tool.poetry]');
@@ -122,6 +130,7 @@ function detectFromPyprojectToml(content) {
   if (lower.includes('django')) framework = 'Django';
   else if (lower.includes('flask')) framework = 'Flask';
   else if (lower.includes('fastapi')) framework = 'FastAPI';
+
   return {
     language: 'Python',
     framework,
@@ -134,6 +143,7 @@ function detectFromPyprojectToml(content) {
     extras: [],
   };
 }
+
 function detectFromCargoToml(content) {
   const hasBin = /\[\[bin\]\]/.test(content);
   return {
@@ -148,6 +158,7 @@ function detectFromCargoToml(content) {
     extras: [],
   };
 }
+
 function detectFromGoMod(content) {
   return {
     language: 'Go',
@@ -161,6 +172,7 @@ function detectFromGoMod(content) {
     extras: [],
   };
 }
+
 function detectFromComposerJson(content) {
   const pkg = safeJsonParse(content) || {};
   const deps = Object.assign({}, pkg.require, pkg['require-dev']);
@@ -168,6 +180,7 @@ function detectFromComposerJson(content) {
   let framework = null;
   if (depNames.some((d) => d.startsWith('laravel/'))) framework = 'Laravel';
   else if (depNames.some((d) => d.startsWith('symfony/'))) framework = 'Symfony';
+
   return {
     language: 'PHP',
     framework,
@@ -180,6 +193,7 @@ function detectFromComposerJson(content) {
     extras: [],
   };
 }
+
 function detectFromPomXml(content) {
   const framework = includesAny(content, ['spring-boot']) ? 'Spring Boot' : null;
   return {
@@ -192,6 +206,7 @@ function detectFromPomXml(content) {
     extras: [],
   };
 }
+
 function detectFromGradle(content) {
   const framework = includesAny(content, ['spring-boot']) ? 'Spring Boot' : null;
   return {
@@ -204,6 +219,7 @@ function detectFromGradle(content) {
     extras: [],
   };
 }
+
 function detectFromGemfile() {
   return {
     language: 'Ruby',
@@ -215,6 +231,7 @@ function detectFromGemfile() {
     extras: [],
   };
 }
+
 function detectFromPubspec() {
   return {
     language: 'Dart/Flutter',
@@ -226,7 +243,9 @@ function detectFromPubspec() {
     extras: [],
   };
 }
-// ─── Эвристика по расширениям файлов (когда манифеста нет) ──────────────────
+
+// ─── Эвристика по расширениям файлов ──────────────────────────────────────
+
 function detectFromExtensions(files) {
   if (hasFileWithExt(files, ['.ts', '.tsx'])) {
     return { language: 'TypeScript', framework: null, packageManager: null,
@@ -280,15 +299,12 @@ function detectFromExtensions(files) {
   }
   return null;
 }
+
 // ─── Главный диспетчер ─────────────────────────────────────────────────────
-/**
- * Определяет стек проекта.
- * @param {{ name: string, content: string } | null} manifest
- * @param {Set<string>} flatFiles Плоский набор относительных путей.
- * @returns {object} Описание стека (см. шапку файла).
- */
+
 function detectStack(manifest, flatFiles) {
   let stack = null;
+
   if (manifest) {
     switch (manifest.name) {
       case 'package.json':      stack = detectFromPackageJson(manifest.content); break;
@@ -306,6 +322,7 @@ function detectStack(manifest, flatFiles) {
       default: stack = null;
     }
   }
+
   if (!stack) {
     stack = detectFromExtensions(flatFiles) || {
       language: null,
@@ -317,6 +334,7 @@ function detectStack(manifest, flatFiles) {
       extras: [],
     };
   }
+
   // Уточнение менеджера пакетов Node по lock-файлам
   if (stack.language && stack.language.startsWith('Node.js')) {
     if (flatFiles.has('pnpm-lock.yaml')) {
@@ -336,6 +354,7 @@ function detectStack(manifest, flatFiles) {
       stack.installCommands = ['bun install'];
     }
   }
+
   // Docker-поддержка
   const dockerSupported = flatFiles.has('Dockerfile') || flatFiles.has('docker-compose.yml') || flatFiles.has('docker-compose.yaml');
   const dockerCommands = [];
@@ -348,12 +367,10 @@ function detectStack(manifest, flatFiles) {
       dockerCommands.push('docker compose up --build');
     }
   }
+
   return Object.assign({ dockerSupported, dockerCommands }, stack);
 }
-/**
- * Превращает структуру стека в текстовую справку, которую можно отдать AI
- * как «готовые подсказки», чтобы он использовал их в README.
- */
+
 function formatStackHints(stack) {
   const lines = [];
   lines.push('### Определённый стек проекта');
@@ -389,4 +406,5 @@ function formatStackHints(stack) {
   }
   return lines.join('\n');
 }
+
 module.exports = { detectStack, formatStackHints };

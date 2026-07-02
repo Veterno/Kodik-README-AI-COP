@@ -1,4 +1,12 @@
 'use strict';
+
+/**
+ * src/tree.js
+ * Построение текстового дерева файлов проекта.
+ * Уважает IGNORED_DIRS / IGNORED_FILES, ограничено глубиной и числом записей.
+ * Если в папке > MAX_FILES_PER_DIR элементов, выводится обобщённая строка.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const {
@@ -6,6 +14,7 @@ const {
   IGNORED_FILES,
   MAX_TREE_DEPTH,
   MAX_TREE_ENTRIES,
+  MAX_FILES_PER_DIR,
 } = require('./config');
 const { log } = require('./logger');
 
@@ -25,6 +34,7 @@ function buildFileTree(rootDir) {
       return;
     }
 
+    // Фильтруем игнорируемые
     const filtered = entries
       .filter((e) => {
         if (e.isDirectory()) {
@@ -37,18 +47,42 @@ function buildFileTree(rootDir) {
         return a.name.localeCompare(b.name);
       });
 
-    filtered.forEach((entry, idx) => {
+    // Для каждой папки подсчитаем количество её непосредственных дочерних элементов (после фильтрации)
+    const processed = filtered.map(entry => {
+      if (entry.isDirectory()) {
+        const fullPath = path.join(dir, entry.name);
+        let subEntries = [];
+        try {
+          subEntries = fs.readdirSync(fullPath, { withFileTypes: true })
+            .filter(e => {
+              if (e.isDirectory()) return !IGNORED_DIRS.has(e.name) && !e.name.startsWith('.git');
+              return !IGNORED_FILES.has(e.name);
+            });
+        } catch { /* ignore */ }
+        const count = subEntries.length;
+        return { entry, count, isBig: count > MAX_FILES_PER_DIR };
+      } else {
+        return { entry, count: 0, isBig: false };
+      }
+    });
+
+    // Выводим каждый элемент
+    processed.forEach((item, idx) => {
       if (counter.value >= MAX_TREE_ENTRIES) return;
       counter.value += 1;
 
-      const isLast = idx === filtered.length - 1;
+      const isLast = idx === processed.length - 1;
       const connector = isLast ? '└── ' : '├── ';
-      const name = entry.isDirectory() ? entry.name + '/' : entry.name;
+      let name = item.entry.isDirectory() ? item.entry.name + '/' : item.entry.name;
+      if (item.isBig) {
+        name += ` (${item.count} элементов)`;  // изменённый формат
+      }
       lines.push(prefix + connector + name);
 
-      if (entry.isDirectory()) {
+      // Если это папка и она не "большая", заходим внутрь
+      if (item.entry.isDirectory() && !item.isBig) {
         const nextPrefix = prefix + (isLast ? '    ' : '│   ');
-        walk(path.join(dir, entry.name), nextPrefix, depth + 1);
+        walk(path.join(dir, item.entry.name), nextPrefix, depth + 1);
       }
     });
   }

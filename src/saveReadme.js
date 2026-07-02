@@ -1,4 +1,11 @@
 'use strict';
+
+/**
+ * src/saveReadme.js
+ * Сохранение сгенерированного Markdown в README.md с резервной копией
+ * предыдущей версии и удалением случайных обёрток ```markdown ... ```.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const { log } = require('./logger');

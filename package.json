@@ -17,7 +17,9 @@
   "author": "GigaCode",
   "license": "MIT",
   "dependencies": {
-    "dotenv": "^16.0.0"
+    "axios": "^1.18.1",
+    "dotenv": "^16.0.0",
+    "inquirer": "^8.2.6"
   },
   "devDependencies": {
     "jest": "^29.0.0"

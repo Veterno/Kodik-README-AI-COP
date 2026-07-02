@@ -1,14 +1,26 @@
 'use strict';
+
+/**
+ * src/mainFile.js
+ * Поиск главного файла исходного кода и чтение его первых строк.
+ */
+
 const fs = require('fs');
 const path = require('path');
-const { MAIN_FILE_CANDIDATES, MAX_MAIN_FILE_LINES } = require('./config');
+const {
+  MAIN_FILE_CANDIDATES,
+  MAX_MAIN_FILE_LINES,
+} = require('./config');
 const { log } = require('./logger');
 
 function findMainFile(rootDir, manifest) {
   const candidates = [...MAIN_FILE_CANDIDATES];
+
   if (manifest && manifest.name === 'package.json') {
     try {
-      const pkg = JSON.parse(manifest.content.replace(/\n\.\.\. \(файл обрезан\)$/, ''));
+      const pkg = JSON.parse(
+        manifest.content.replace(/\n\.\.\. \(файл обрезан\)$/, '')
+      );
       if (pkg && typeof pkg.main === 'string') candidates.unshift(pkg.main);
       if (pkg && pkg.bin && typeof pkg.bin === 'object') {
         Object.values(pkg.bin).forEach((v) => {
@@ -16,12 +28,14 @@ function findMainFile(rootDir, manifest) {
         });
       }
     } catch {
-      // ignore
+      /* некорректный JSON — игнорируем */
     }
   }
+
   for (const rel of candidates) {
     const fullPath = path.join(rootDir, rel);
     if (!fs.existsSync(fullPath)) continue;
+
     try {
       const stat = fs.statSync(fullPath);
       if (!stat.isFile()) continue;
@@ -32,6 +46,7 @@ function findMainFile(rootDir, manifest) {
       log.warn(`Не удалось прочитать "${rel}": ${err.message}`);
     }
   }
+
   return null;
 }
 
