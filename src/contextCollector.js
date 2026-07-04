@@ -1,80 +1,65 @@
 'use strict';
 
-/**
- * src/contextCollector.js
- * Сбор бизнес-контекста из Git-лога, файлов документации и верхнеуровневых описаний.
- */
-
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { resolveSafePath } = require('./utils/pathUtils');
 
+const { log } = require('./logger');
 function getGitLogSummary(rootDir) {
   try {
-    const output = execSync('git log --oneline -n 30', { cwd: rootDir, encoding: 'utf8' });
+    const gitDir = path.join(rootDir, '.git');
+    if (!fs.existsSync(gitDir)) {
+      return { commits: [], features: [], fixes: [], docs: [] };
+    }
+    const output = execSync('git log --oneline -n 30', { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     const commits = output.split('\n').filter(Boolean);
-    // Выделяем коммиты с типами (conventional commits)
     const features = commits.filter(line => /^feat(\(.*\))?:/.test(line));
     const fixes = commits.filter(line => /^fix(\(.*\))?:/.test(line));
     const docs = commits.filter(line => /^docs(\(.*\))?:/.test(line));
     return { commits, features, fixes, docs };
-  } catch {
+  } catch (err) {
+    log.debug(`Git не доступен или ошибка при чтении лога в "${rootDir}": ${err.message}`);
     return { commits: [], features: [], fixes: [], docs: [] };
   }
 }
+function readDocFiles(rootDir, scannedDocs) {
+  if (scannedDocs) {
+    const content = {};
+    scannedDocs.forEach(doc => {
+      // Исключаем readme.md из бизнес-контекста, чтобы не зацикливаться
+      if (doc.name.toLowerCase() !== 'readme.md') {
+        content[doc.name] = doc.content;
+      }
+    });
+    return content;
+  }
 
-function readDocFiles(rootDir) {
-  // Расширенный список файлов документации
-  const files = [
-    'PRODUCT.md', 'ROADMAP.md', 'README.md',
-    'USER_STORIES.md', 'FEATURES.md', 'CHANGELOG.md'
-  ];
+  // Fallback для старого поведения (если scannedDocs не передан)
+  const files = ['PRODUCT.md', 'ROADMAP.md', 'USER_STORIES.md', 'FEATURES.md', 'CHANGELOG.md'];
   const content = {};
   for (const file of files) {
-    const fullPath = path.join(rootDir, file);
-    if (fs.existsSync(fullPath)) {
-      try {
-        const raw = fs.readFileSync(fullPath, 'utf8');
-        // Извлекаем только заголовки и списки (первые 50 строк)
-        const lines = raw.split('\n')
-          .filter(line => line.match(/^#{1,3}\s|^-\s|^\*\s/))
-          .slice(0, 50);
-        if (lines.length) {
-          content[file] = lines.join('\n');
-        }
-      } catch {
-        // игнорируем ошибки чтения
-      }
-    }
-  }
-
-  // Дополнительно проверяем папку docs/
-  const docsDir = path.join(rootDir, 'docs');
-  if (fs.existsSync(docsDir)) {
     try {
-      const docsFiles = fs.readdirSync(docsDir).filter(f => f.endsWith('.md')).slice(0, 5);
-      for (const f of docsFiles) {
-        const fullPath = path.join(docsDir, f);
-        const raw = fs.readFileSync(fullPath, 'utf8');
-        const lines = raw.split('\n')
-          .filter(line => line.match(/^#{1,3}\s|^-\s|^\*\s/))
-          .slice(0, 30);
-        if (lines.length) {
-          content[`docs/${f}`] = lines.join('\n');
-        }
-      }
-    } catch {
-      // ignore
+      const fullPath = resolveSafePath(rootDir, file);
+      if (fs.existsSync(fullPath)) {
+        try {
+          const raw = fs.readFileSync(fullPath, 'utf8');
+          const lines = raw.split('\n')
+            .filter(line => line.match(/^#{1,3}\s|^-\s|^\*\s/))
+            .slice(0, 50);
+          if (lines.length) content[file] = lines.join('\n');
+        } catch (err) {
+          log.debug(`Не удалось прочитать документ "${file}" в contextCollector: ${err.message}`);
+        }    }
+    } catch (err) {
+      log.debug(`Пропуск документа из-за ошибки безопасности: ${err.message}`);
     }
-  }
-
-  return content;
+  }  return content;
 }
 
-function collectBusinessContext(rootDir) {
+function collectBusinessContext(rootDir, scannedDocs) {
   const git = getGitLogSummary(rootDir);
-  const docs = readDocFiles(rootDir);
+  const docs = readDocFiles(rootDir, scannedDocs);
   return { ...git, docs };
 }
-
 module.exports = { collectBusinessContext };

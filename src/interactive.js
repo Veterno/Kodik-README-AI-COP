@@ -3,73 +3,110 @@
 /**
  * src/interactive.js
  * Интерактивный CLI-опрос для уточнения аудитории, тона и бизнес-ценности.
- * Использует библиотеку inquirer. Если передан флаг --non-interactive, опрос пропускается.
+ * Использует библиотеку prompts. Если передан флаг --non-interactive, опрос пропускается.
  */
 
-const inquirer = require('inquirer');
+const prompts = require('prompts');
+const { DEFAULT_ANSWERS } = require('./config');
+const { log } = require('./logger');
 
-async function runInteractive(flags) {
-  if (flags.nonInteractive) {
-    return {
-      audience: 'developers',
-      tone: 'technical',
-      value: null,
-    };
+async function runInteractive(options, detectedLicense = null) {
+  const initialAnswers = {
+    ...options.answers,
+    license: detectedLicense || options.answers.license
+  };
+
+  if (options.nonInteractive) {
+    return initialAnswers;
   }
 
   const questions = [
     {
-      type: 'list',
+      type: 'select',
       name: 'audience',
       message: 'Для кого этот проект?',
       choices: [
-        { name: 'Конечные пользователи (B2C)', value: 'end-users' },
-        { name: 'Разработчики (библиотека/API)', value: 'developers' },
-        { name: 'Бизнес-клиенты (B2B)', value: 'business' },
+        { title: 'Конечные пользователи (B2C)', value: 'end-users' },
+        { title: 'Разработчики (библиотека/API)', value: 'developers' },
+        { title: 'Бизнес-клиенты (B2B)', value: 'business' },
       ],
-      default: 'developers',
+      initial: [
+        'end-users',
+        'developers',
+        'business'
+      ].indexOf(initialAnswers.audience) !== -1 ? ['end-users', 'developers', 'business'].indexOf(initialAnswers.audience) : 1,
     },
     {
-      type: 'list',
+      type: 'select',
       name: 'tone',
       message: 'Какой тон описания предпочитаете?',
       choices: [
-        { name: 'Строгий технический', value: 'technical' },
-        { name: 'Маркетинговый/продуктовый', value: 'marketing' },
-        { name: 'Минималистичный', value: 'minimal' },
+        { title: 'Строгий технический', value: 'technical' },
+        { title: 'Маркетинговый/продуктовый', value: 'marketing' },
+        { title: 'Минималистичный', value: 'minimal' },
       ],
-      default: 'technical',
+      initial: ['technical', 'marketing', 'minimal'].indexOf(initialAnswers.tone) !== -1 ? ['technical', 'marketing', 'minimal'].indexOf(initialAnswers.tone) : 0,
     },
     {
-      type: 'input',
+      type: 'text',
       name: 'value',
       message: 'Главная бизнес-ценность (кратко, опционально):',
-      default: '',
+      initial: initialAnswers.value || '',
     },
-    // ... после существующих вопросов
     {
-      type: 'list',
+      type: 'select',
       name: 'projectType',
       message: 'Какой тип проекта?',
       choices: [
-        { name: 'Веб-приложение / API', value: 'web' },
-        { name: 'Библиотека / SDK', value: 'library' },
-        { name: 'CLI-инструмент', value: 'cli' },
-        { name: 'Микросервис', value: 'microservice' },
-        { name: 'Мобильное приложение', value: 'mobile' },
-        { name: 'Другое', value: 'other' },
+        { title: 'Веб-приложение / API', value: 'web' },
+        { title: 'Библиотека / SDK', value: 'library' },
+        { title: 'CLI-инструмент', value: 'cli' },
+        { title: 'Микросервис', value: 'microservice' },
+        { title: 'Мобильное приложение', value: 'mobile' },
+        { title: 'Другое', value: 'other' },
       ],
-      default: 'web',
+      initial: ['web', 'library', 'cli', 'microservice', 'mobile', 'other'].indexOf(initialAnswers.projectType) !== -1 ? ['web', 'library', 'cli', 'microservice', 'mobile', 'other'].indexOf(initialAnswers.projectType) : 0,
     },
     {
-      type: 'input',
+      type: 'text',
       name: 'keyFeatures',
       message: 'Перечислите ключевые функции (через запятую, опционально):',
-      default: '',
+      initial: initialAnswers.keyFeatures || '',
+    },
+    {
+      type: (prev, values) => (!detectedLicense ? 'select' : null),
+      name: 'license',
+      message: 'Какую лицензию использовать?',
+      choices: [
+        { title: 'MIT', value: 'MIT' },
+        { title: 'Apache 2.0', value: 'Apache 2.0' },
+        { title: 'GPL v3', value: 'GPL v3' },
+        { title: 'BSD 3-Clause', value: 'BSD 3-Clause' },
+        { title: 'Unlicense', value: 'Unlicense' },
+        { title: 'Proprietary', value: 'Proprietary' },
+      ],
+      initial: 0,
     },
   ];
 
-  return inquirer.prompt(questions);
-}
+  try {
+    const response = await prompts(questions, {
+      onCancel: () => {
+        throw new Error('INTERRUPTED');
+      }
+    });
 
+    if (detectedLicense && !response.license) {
+      response.license = detectedLicense;
+    }
+
+    return { ...initialAnswers, ...response };
+  } catch (err) {
+    if (err.message === 'INTERRUPTED') {
+      console.log('\n\x1b[33m⚠️  Опрос прерван пользователем. Используются текущие настройки.\x1b[0m');
+      return initialAnswers;
+    }
+    throw err;
+  }
+}
 module.exports = { runInteractive };

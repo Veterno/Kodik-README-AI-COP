@@ -7,13 +7,14 @@
 
 const fs = require('fs');
 const path = require('path');
+const { resolveSafePath } = require('./utils/pathUtils');
 const {
   MAIN_FILE_CANDIDATES,
   MAX_MAIN_FILE_LINES,
 } = require('./config');
 const { log } = require('./logger');
 
-function findMainFile(rootDir, manifest) {
+function findMainFile(rootDir, manifest, flatFiles) {
   const candidates = [...MAIN_FILE_CANDIDATES];
 
   if (manifest && manifest.name === 'package.json') {
@@ -27,27 +28,34 @@ function findMainFile(rootDir, manifest) {
           if (typeof v === 'string') candidates.unshift(v);
         });
       }
-    } catch {
-      /* некорректный JSON — игнорируем */
-    }
-  }
+    } catch (err) {
+      log.debug(`Ошибка при парсинге package.json в findMainFile: ${err.message}`);
+    }  }
 
   for (const rel of candidates) {
-    const fullPath = path.join(rootDir, rel);
-    if (!fs.existsSync(fullPath)) continue;
+    const normalizedRel = rel.replace(/\\/g, '/');
+    // Используем flatFiles для проверки существования
+    if (flatFiles && !flatFiles.has(normalizedRel)) continue;
+    
+    let fullPath;
+    try {
+      fullPath = resolveSafePath(rootDir, rel);
+    } catch (err) {
+      log.debug(`Пропуск кандидата из-за ошибки безопасности: ${err.message}`);
+      continue;
+    }
+
+    // Если flatFiles нет (старый режим), используем fs.existsSync
+    if (!flatFiles && !fs.existsSync(fullPath)) continue;
 
     try {
-      const stat = fs.statSync(fullPath);
-      if (!stat.isFile()) continue;
       const raw = fs.readFileSync(fullPath, 'utf8');
       const lines = raw.split(/\r?\n/).slice(0, MAX_MAIN_FILE_LINES);
-      return { name: rel.replace(/\\/g, '/'), content: lines.join('\n') };
+      return { name: normalizedRel, content: lines.join('\n') };
     } catch (err) {
       log.warn(`Не удалось прочитать "${rel}": ${err.message}`);
     }
   }
 
   return null;
-}
-
-module.exports = { findMainFile };
+}module.exports = { findMainFile };

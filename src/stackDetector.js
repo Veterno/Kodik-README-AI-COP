@@ -18,14 +18,16 @@
  *   }
  */
 
-function safeJsonParse(text) {
+const { log } = require('./logger');
+
+function safeJsonParse(text, context = 'unknown') {
   try {
     return JSON.parse(text.replace(/\n\.\.\. \(файл обрезан\)$/, ''));
-  } catch {
+  } catch (err) {
+    log.debug(`Ошибка парсинга JSON (${context}): ${err.message}`);
     return null;
   }
 }
-
 function includesAny(haystack, needles) {
   const lower = (haystack || '').toLowerCase();
   return needles.some((n) => lower.includes(n.toLowerCase()));
@@ -42,8 +44,7 @@ function hasFileWithExt(files, exts) {
 // ─── Детекторы по манифестам ────────────────────────────────────────────────
 
 function detectFromPackageJson(content) {
-  const pkg = safeJsonParse(content) || {};
-  const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies, pkg.peerDependencies);
+  const pkg = safeJsonParse(content, 'package.json') || {};  const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies, pkg.peerDependencies);
   const depNames = Object.keys(deps);
   const isTs = depNames.includes('typescript') || depNames.includes('ts-node');
 
@@ -65,10 +66,9 @@ function detectFromPackageJson(content) {
     if (depNames.includes(key)) { framework = name; break; }
   }
 
-  const packageManager = 'npm';
+  const packageManager = 'npm'; // По умолчанию
 
-  const installCommands = ['npm install'];
-  const runCommands = [];
+  const installCommands = ['npm install'];  const runCommands = [];
   if (pkg.scripts && typeof pkg.scripts === 'object') {
     if (pkg.scripts.start) runCommands.push('npm start');
     else if (pkg.scripts.dev) runCommands.push('npm run dev');
@@ -90,7 +90,7 @@ function detectFromPackageJson(content) {
     language: isTs ? 'Node.js (TypeScript)' : 'Node.js (JavaScript)',
     framework,
     packageManager,
-    requirements: ['Node.js v18 или новее', 'npm (входит в состав Node.js)'],
+    requirements: ['Node.js v18 или новее'],
     installCommands,
     runCommands,
     extras,
@@ -174,8 +174,7 @@ function detectFromGoMod(content) {
 }
 
 function detectFromComposerJson(content) {
-  const pkg = safeJsonParse(content) || {};
-  const deps = Object.assign({}, pkg.require, pkg['require-dev']);
+  const pkg = safeJsonParse(content, 'composer.json') || {};  const deps = Object.assign({}, pkg.require, pkg['require-dev']);
   const depNames = Object.keys(deps);
   let framework = null;
   if (depNames.some((d) => d.startsWith('laravel/'))) framework = 'Laravel';
@@ -340,21 +339,30 @@ function detectStack(manifest, flatFiles) {
     if (flatFiles.has('pnpm-lock.yaml')) {
       stack.packageManager = 'pnpm';
       stack.installCommands = ['pnpm install'];
+      stack.requirements.push('pnpm');
       stack.runCommands = stack.runCommands.map((c) =>
         c.startsWith('npm ') ? c.replace(/^npm/, 'pnpm') : c
       );
     } else if (flatFiles.has('yarn.lock')) {
       stack.packageManager = 'yarn';
       stack.installCommands = ['yarn install'];
+      stack.requirements.push('yarn');
       stack.runCommands = stack.runCommands.map((c) =>
         c.startsWith('npm ') ? c.replace(/^npm/, 'yarn') : c
       );
     } else if (flatFiles.has('bun.lockb')) {
       stack.packageManager = 'bun';
       stack.installCommands = ['bun install'];
+      stack.requirements.push('bun');
+      stack.runCommands = stack.runCommands.map((c) =>
+        c.startsWith('npm ') ? c.replace(/^npm/, 'bun') : c
+      );
+    } else {
+      // Если lock-файлов нет, используем npm по умолчанию
+      stack.packageManager = 'npm';
+      stack.requirements.push('npm (входит в состав Node.js)');
     }
   }
-
   // Docker-поддержка
   const dockerSupported = flatFiles.has('Dockerfile') || flatFiles.has('docker-compose.yml') || flatFiles.has('docker-compose.yaml');
   const dockerCommands = [];
