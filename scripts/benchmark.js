@@ -92,8 +92,11 @@ ${codeContext}`;
 }
 
 async function main() {
-  ensureDir(TEMP_DIR);
-  ensureDir(RESULTS_DIR);
+  if (!process.env.OPENAI_API_KEY && !process.env.USE_AI === 'false') {
+    console.warn('\x1b[33mПредупреждение: OPENAI_API_KEY не найден. Бенчмарк будет запущен в ограниченном режиме (без AI-валидации).\x1b[0m');
+  }
+
+  ensureDir(TEMP_DIR);  ensureDir(RESULTS_DIR);
 
   const summary = [];
 

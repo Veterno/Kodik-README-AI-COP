@@ -18,8 +18,8 @@ class AiClient {
     this.model = config.model || process.env.OPENAI_MODEL || 'llama3.1';
     this.provider = config.provider || this._detectProvider(this.baseURL);    
     this.temperature = config.temperature ?? parseFloat(process.env.OPENAI_TEMPERATURE || AI_CONFIG.DEFAULT_TEMPERATURE);
-    this.timeout = AI_CONFIG.TIMEOUT;
-    this.maxRetries = AI_CONFIG.RETRY_ATTEMPTS;
+    this.timeout = config.timeout || AI_CONFIG.TIMEOUT;
+    this.maxRetries = config.retryAttempts ?? config.maxRetries ?? AI_CONFIG.RETRY_ATTEMPTS;
   }
 
   /**

@@ -33,7 +33,7 @@ async function finalScan(markdown, options) {
   for (const sectionName of SECTIONS) {
     // Динамическое создание регулярного выражения для поиска раздела
     // Ищем заголовок ## Эмодзи? Название раздела
-    const sectionRegex = new RegExp(`(## [^\n]*?${sectionName}\n\n?)([\s\S]*?)(?=\n##|$)`, 'i');
+    const sectionRegex = new RegExp(`(## [^\\n]*?${sectionName}\\n\\n?)([\\s\\S]*?)(?=\\n##|$)`, 'i');
     const match = updatedMarkdown.match(sectionRegex);
 
     if (match) {

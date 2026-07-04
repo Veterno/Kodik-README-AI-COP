@@ -81,9 +81,6 @@ function scanProject(rootDir) {
           counter.tree++;
           const connector = isLast ? '└── ' : '├── ';
           let treeName = name + '/';
-          if (isBigDir) {
-            treeName += ` (${count} элементов)`;
-          }
           treeLines.push(prefix + connector + treeName);
         }
 

@@ -103,7 +103,7 @@ module.exports = {
   MAX_TREE_ENTRIES,
   MAX_MANIFEST_BYTES,
   MAX_FILES_PER_DIR,
-  DOCS_FILES: new Set(['readme.md', 'contributing.md', 'changelog.md', 'code_of_conduct.md', 'security.md']),
+  DOCS_FILES: new Set(['readme.md', 'contributing.md', 'changelog.md', 'code_of_conduct.md', 'security.md', 'features.md', 'product.md', 'roadmap.md', 'user_stories.md']),
   SENSITIVE_PATTERNS,
   AI_CONFIG: {
     RETRY_ATTEMPTS: parseInt(process.env.AI_RETRY_ATTEMPTS || '3', 10),

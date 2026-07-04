@@ -14,10 +14,9 @@ function getGitLogSummary(rootDir) {
     }
     const output = execSync('git log --oneline -n 30', { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     const commits = output.split('\n').filter(Boolean);
-    const features = commits.filter(line => /^feat(\(.*\))?:/.test(line));
-    const fixes = commits.filter(line => /^fix(\(.*\))?:/.test(line));
-    const docs = commits.filter(line => /^docs(\(.*\))?:/.test(line));
-    return { commits, features, fixes, docs };
+    const features = commits.filter(line => /^[a-f0-9]+\s+feat(\(.*\))?:/i.test(line));
+    const fixes = commits.filter(line => /^[a-f0-9]+\s+fix(\(.*\))?:/i.test(line));
+    const docs = commits.filter(line => /^[a-f0-9]+\s+docs(\(.*\))?:/i.test(line));    return { commits, features, fixes, docs };
   } catch (err) {
     log.debug(`Git не доступен или ошибка при чтении лога в "${rootDir}": ${err.message}`);
     return { commits: [], features: [], fixes: [], docs: [] };

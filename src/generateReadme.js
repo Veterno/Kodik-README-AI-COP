@@ -10,6 +10,7 @@
 
 const { detectStack } = require('./stackDetector');
 const { AiClient } = require('./aiClient');
+const { log } = require('./logger');
 
 /**
  * Генерирует README.

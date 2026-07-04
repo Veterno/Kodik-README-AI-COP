@@ -48,8 +48,7 @@ function getTimestamp() {
 function initLogger() {
   if (!config.file || logStream) return;
 
-  try {
-    const logPath = path.resolve(process.cwd(), config.file);
+  try {    const logPath = path.resolve(process.cwd(), config.file);
     const logDir = path.dirname(logPath);
     
     if (!fs.existsSync(logDir)) {
