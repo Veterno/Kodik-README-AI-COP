@@ -9,7 +9,8 @@
  */
 
 const { detectStack } = require('./stackDetector');
-const { callAI } = require('./aiClient');
+const { AiClient } = require('./aiClient');
+const { log } = require('./logger');
 
 /**
  * Генерирует README.
@@ -21,17 +22,13 @@ const { callAI } = require('./aiClient');
  * @param {object|null} params.mainFile
  * @param {object} params.interactiveAnswers - ответы из опроса (audience, tone, value, projectType, keyFeatures)
  * @param {object} params.businessContext - бизнес-контекст (commits, features, docs и т.д.)
- * @param {string} params.codeContext - текстовый контекст из кода (от collectCodeContext) – пока не используется, но оставлено для AI
+ * @param {string} params.codeContext - текстовый контекст из кода (от collectCodeContext)
  * @returns {Promise<{ markdown: string, stack: object }>}
  */
-async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile, interactiveAnswers, businessContext, codeContext }) {
-  // По умолчанию USE_AI = true, если не указано false
-  const useAI = process.env.USE_AI !== 'false';
-
-  // 1. Определяем стек (всегда)
-  const stack = detectStack(manifest, flatFiles);
-
-  // 2. Если включён AI – генерируем через модель
+async function generateReadme({ projectName, tree, flatFiles, manifests, manifest, mainFile, interactiveAnswers, businessContext, codeContext, detectedLicense, options }) {
+  let markdown;
+  const useAI = options.ai.enabled;
+  const stack = detectStack(manifests && manifests.length > 0 ? manifests[0] : manifest, flatFiles);
   if (useAI) {
     const context = buildContextString({
       projectName,
@@ -44,51 +41,164 @@ async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile
       codeContext,
     });
 
-    // Получаем тон из ответов (если есть)
-    const tone = interactiveAnswers?.tone || 'technical';
+    const tone = interactiveAnswers?.tone || options.content.tone || 'technical';
+    const licenseName = detectedLicense || interactiveAnswers?.license || options.answers.license || 'MIT';
 
-    // Системный промпт с учётом тона
-    const systemPrompt = `Ты — эксперт по технической документации. Сгенерируй README.md для проекта на основе предоставленного контекста.
-Следуй структуре:
-# Название проекта
-## Описание (опиши, что это за программа, для кого она, какие проблемы решает, основные сценарии использования. Используй живой, понятный язык, ориентируйся на целевую аудиторию. Не перечисляй технологии в описании, они будут в отдельном разделе. Если есть информация о бизнес-ценности или целевой аудитории, обязательно используй её.)
-## Ключевые возможности (перечисли основные функции, которые видны из кода и структуры, а также те, что указал пользователь)
-## Стек технологий
-## Быстрый старт (установка, запуск)
-## Структура проекта (кратко, если есть дерево)
-## Лицензия
+    const genLang = options.content?.generationLanguage || 'ru';
+    const langMap = {
+      'ru': 'русский',
+      'en': 'английский',
+      'es': 'испанский',
+      'fr': 'французский',
+      'de': 'немецкий',
+      'zh': 'китайский'
+    };
+    const langFull = langMap[genLang] || genLang;
 
-Тон описания: {tone}.
-- Если tone = marketing: описание должно быть вдохновляющим, акцентировать выгоды, быть энергичным и продающим. Используй яркие формулировки, подчеркивай ценность для пользователя.
-- Если tone = technical: описание должно быть чётким, фактологичным, с акцентом на технические детали, нейтральным и точным.
-- Если tone = minimal: описание должно быть кратким, только суть, без лишних слов.
+    // УЖЕСТОЧЁННЫЙ СИСТЕМНЫЙ ПРОМПТ (строго JSON, без пояснений)
+    const systemPrompt = `Ты — эксперт по технической документации.  
+Твоя задача — сгенерировать README в виде строгого JSON-объекта на языке: ${langFull}.  
+Используй ТОЛЬКО информацию из предоставленного контекста, не выдумывай факты.  В ответе должен быть только JSON, без дополнительных пояснений, без маркеров кода.  
 
-Отвечай только готовым README, без лишних пояснений. Не выдумывай факты, используй только информацию из контекста.`;
+Название проекта (title) ОБЯЗАТЕЛЬНО должно быть: "${projectName}".
 
-    const userPrompt = `Контекст проекта (включая выдержки из кода):\n${context}\n\nСгенерируй README.md.`;
+Структура JSON должна быть следующей:{
+  "title": "Название проекта",
+  "description": "Краткое описание (назначение, аудитория, бизнес-ценность) — всё в одной строке, без markdown-разметки.",
+  "features": [
+    { "name": "Название функции", "description": "Краткое описание" }
+  ],
+  "stack": {
+    "language": "Язык программирования",
+    "framework": "Фреймворк (если есть)",
+    "packageManager": "Менеджер пакетов",
+    "extras": ["Дополнительные технологии"]
+  },
+  "quickStart": {
+    "requirements": ["Требование 1", "Требование 2"],
+    "installCommands": ["команда установки", "..."],
+    "runCommands": ["команда запуска", "..."]
+  },
+  "projectStructure": "Краткое описание структуры или само дерево (можно взять из контекста)",
+  "license": "Тип лицензии (если есть, иначе MIT)"
+}
 
-    const temperature = parseFloat(process.env.OPENAI_TEMPERATURE || 0.7);
-    const topP = parseFloat(process.env.OPENAI_TOP_P || 0.9);
+Убедись, что все поля присутствуют. Если информация отсутствует, оставь пустую строку или пустой массив, но не пропускай поля.  
+Тон описания: ${tone}.  
+Лицензия проекта: ${licenseName}.
+Желаемый тон означает стиль изложения (technical — сухо и фактологично, marketing — энергично и продающе, minimal — кратко).`;
+    const userPrompt = `Контекст проекта:\n${context}\n\nСгенерируй README в виде JSON по указанной структуре.`;
 
     try {
-      let markdown = await callAI(userPrompt, systemPrompt, { temperature, topP });
-      // Убираем возможные обёртки ```markdown ... ```
-      markdown = markdown.replace(/^```(?:markdown|md)?\s*/i, '').replace(/```\s*$/i, '').trim();
+      const client = new AiClient(options.ai);
+      const jsonResult = await client.generateReadme({ systemPrompt, userPrompt }, { json: true });
+      if (!jsonResult || typeof jsonResult !== 'object' || !jsonResult.title) {
+        throw new Error('Не удалось получить валидный JSON от AI.');
+      }
+
+      // ---- СБОРКА README ИЗ JSON (без изменений) ----
+      const parts = [];
+      parts.push(`# 🚀 ${jsonResult.title}`);
+      parts.push('');
+
+      if (jsonResult.description) {
+        parts.push('## 📝 Описание');
+        parts.push('');
+        parts.push(jsonResult.description);
+        parts.push('');
+      }
+
+      if (jsonResult.features && Array.isArray(jsonResult.features) && jsonResult.features.length) {
+        parts.push('## ✨ Ключевые возможности');
+        parts.push('');
+        jsonResult.features.forEach(f => {
+          if (f && typeof f === 'object') {
+            const name = f.name || '';
+            const desc = f.description ? ` — ${f.description}` : '';
+            if (name) parts.push(`- **${name}**${desc}`);
+          } else if (f) {
+            parts.push(`- ${f}`);
+          }
+        });
+        parts.push('');
+      }
+
+      if (jsonResult.stack && typeof jsonResult.stack === 'object') {
+        parts.push('## 🛠️ Стек технологий');
+        parts.push('');
+        const s = jsonResult.stack;
+        if (s.language) parts.push(`- **Язык:** ${s.language}`);
+        if (s.framework) parts.push(`- **Фреймворк:** ${s.framework}`);
+        if (s.packageManager) parts.push(`- **Пакетный менеджер:** ${s.packageManager}`);
+        if (s.extras && Array.isArray(s.extras) && s.extras.length) {
+          parts.push(`- **Дополнительно:** ${s.extras.join(', ')}`);
+        }
+        parts.push('');
+      }
+
+      if (jsonResult.quickStart && typeof jsonResult.quickStart === 'object') {
+        parts.push('## 📦 Быстрый старт');
+        parts.push('');
+        const qs = jsonResult.quickStart;
+        if (qs.requirements && Array.isArray(qs.requirements) && qs.requirements.length) {
+          parts.push('### Требования');
+          parts.push('');
+          qs.requirements.forEach(req => parts.push(`- ${req}`));
+          parts.push('');
+        }
+        if ((qs.installCommands && Array.isArray(qs.installCommands) && qs.installCommands.length) ||
+            (qs.runCommands && Array.isArray(qs.runCommands) && qs.runCommands.length)) {
+          parts.push('### Установка и запуск');
+          parts.push('');
+          parts.push('```bash');
+          if (qs.installCommands && Array.isArray(qs.installCommands) && qs.installCommands.length) {
+            parts.push('# Установка зависимостей');
+            qs.installCommands.forEach(cmd => parts.push(cmd));
+            parts.push('');
+          }
+          if (qs.runCommands && Array.isArray(qs.runCommands) && qs.runCommands.length) {
+            parts.push('# Запуск');
+            qs.runCommands.forEach(cmd => parts.push(cmd));
+          }
+          parts.push('```');
+          parts.push('');
+        }
+      }
+
+      if (jsonResult.projectStructure) {
+        parts.push('## 📂 Структура проекта');
+        parts.push('');
+        if (String(jsonResult.projectStructure).startsWith('```')) {
+          parts.push(jsonResult.projectStructure);
+        } else {
+          parts.push('```');
+          parts.push(jsonResult.projectStructure);
+          parts.push('```');
+        }
+        parts.push('');
+      }
+
+      if (jsonResult.license) {
+        parts.push('## 📄 Лицензия');
+        parts.push('');
+        parts.push(jsonResult.license);
+        parts.push('');
+      }
+
+      markdown = parts.join('\n');
       return { markdown, stack };
     } catch (err) {
-      console.warn('⚠️  AI-генерация недоступна, используется локальный шаблон.');
+      log.warn(`AI-генерация недоступна или возвращён некорректный JSON: ${err.message}. Используется локальный шаблон.`);
+      log.debug('AI Generation Error Details:', err);
       // Падаем в локальный режим
-    }
-  }
+    }  }
 
-  // 3. Локальная генерация (без AI) – улучшенный шаблон
+  // ---------- ЛОКАЛЬНАЯ ГЕНЕРАЦИЯ (БЕЗ AI) ----------
   const parts = [];
 
-  // Заголовок
   parts.push(`# 🚀 ${projectName}`);
   parts.push('');
 
-  // --- ОПИСАНИЕ ---
   const description = buildDescription({
     projectName,
     stack,
@@ -101,14 +211,12 @@ async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile
   parts.push(description);
   parts.push('');
 
-  // --- КЛЮЧЕВЫЕ ВОЗМОЖНОСТИ ---
   const features = buildFeaturesList({ interactiveAnswers, tree, flatFiles });
   parts.push('## ✨ Ключевые возможности');
   parts.push('');
   features.forEach(f => parts.push(`- ${f}`));
   parts.push('');
 
-  // --- СТЕК ТЕХНОЛОГИЙ ---
   parts.push('## 🛠️ Стек технологий');
   parts.push('');
   parts.push(`- **Язык:** ${stack.language || 'не определён'}`);
@@ -119,7 +227,6 @@ async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile
   }
   parts.push('');
 
-  // Зависимости (если есть package.json)
   if (manifest && manifest.name === 'package.json') {
     try {
       const pkg = JSON.parse(manifest.content.replace(/\n\.\.\. \(файл обрезан\)$/, ''));
@@ -139,16 +246,16 @@ async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile
         parts.push('```');
         parts.push('');
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      log.debug(`Ошибка парсинга package.json в локальном шаблоне: ${err.message}`);
+    }
   }
 
-  // --- БЫСТРЫЙ СТАРТ ---
   const quickStart = buildQuickStart({ stack });
   parts.push('## 📦 Быстрый старт');
   parts.push(quickStart);
   parts.push('');
 
-  // Альтернативный запуск через Docker (если поддерживается)
   if (stack.dockerSupported && stack.dockerCommands.length) {
     parts.push('### Запуск через Docker');
     parts.push('');
@@ -158,7 +265,6 @@ async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile
     parts.push('');
   }
 
-  // --- СТРУКТУРА ПРОЕКТА ---
   parts.push('## 📂 Структура проекта');
   parts.push('');
   parts.push('```');
@@ -166,26 +272,20 @@ async function generateReadme({ projectName, tree, flatFiles, manifest, mainFile
   parts.push('```');
   parts.push('');
 
-  // --- ЛИЦЕНЗИЯ ---
   parts.push('## 📄 Лицензия');
   parts.push('');
-  parts.push('MIT');
+  parts.push(detectedLicense || interactiveAnswers?.license || 'MIT');
   parts.push('');
+  markdown = parts.join('\n');
+  return { markdown, stack };}
 
-  const markdown = parts.join('\n');
-  return { markdown, stack };
-}
-
-// ──────────────────── ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ЛОКАЛЬНОЙ ГЕНЕРАЦИИ ────────────────────
+// ─── ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ─────────────────────────────────────────────
 
 /**
  * Формирует описание проекта с учётом тона, бизнес-контекста и ответов пользователя.
+ * ИСПРАВЛЕНО: исключаем README.md из контекста, очищаем строки от маркеров.
  */
 function buildDescription({ projectName, stack, interactiveAnswers, businessContext, tone }) {
-  const parts = [];
-
-  // 1. Базовое введение: что это за проект
-  let intro = '';
   const typeMap = {
     web: 'веб-приложение',
     library: 'библиотеку',
@@ -200,14 +300,13 @@ function buildDescription({ projectName, stack, interactiveAnswers, businessCont
   const language = stack.language || 'неизвестном языке';
   const framework = stack.framework ? ` с использованием **${stack.framework}**` : '';
 
+  let intro = '';
   if (projectType !== 'other') {
     intro = `**${projectName}** — это ${typeLabel} на **${language}**${framework}.`;
   } else {
     intro = `**${projectName}** — это проект на **${language}**${framework}.`;
   }
 
-  // 2. Целевая аудитория и бизнес-ценность
-  let audienceText = '';
   const audienceMap = {
     'end-users': 'конечных пользователей',
     'developers': 'разработчиков',
@@ -221,80 +320,59 @@ function buildDescription({ projectName, stack, interactiveAnswers, businessCont
     valueText = interactiveAnswers.value;
   }
 
-  // 3. Дополнительная информация из бизнес-контекста (документация, коммиты)
+  // --- ИЗВЛЕЧЕНИЕ ИНФОРМАЦИИ ИЗ БИЗНЕС-КОНТЕКСТА (БЕЗ README.md И БЕЗ МАРКЕРОВ) ---
   let contextInfo = '';
-  if (businessContext) {
-    // Если есть файлы документации, извлекаем из них ключевые фразы
-    const docPhrases = [];
-    if (businessContext.docs) {
-      for (const [file, content] of Object.entries(businessContext.docs)) {
-        // Ищем строки, начинающиеся с # или - и берем первые 2-3
-        const lines = content.split('\n').filter(line => line.match(/^#{1,3}\s|^-\s|^\*\s/)).slice(0, 3);
-        if (lines.length) {
-          docPhrases.push(lines.join(' '));
-        }
-      }
+  if (businessContext && businessContext.docs) {
+    const phrases = [];
+    for (const [file, content] of Object.entries(businessContext.docs)) {
+      // ИСКЛЮЧАЕМ САМ README.md, ЧТОБЫ НЕ БЫЛО ЗАЦИКЛИВАНИЯ
+      if (file === 'README.md') continue;
+      const lines = content.split('\n')
+        .filter(line => line.match(/^#{1,3}\s|^-\s|^\*\s/))
+        .slice(0, 3)
+        .map(line => line.replace(/^#{1,3}\s*/, '').replace(/^[-*]\s*/, '').trim())
+        .filter(Boolean);
+      if (lines.length) phrases.push(lines.join(' '));
     }
-    if (docPhrases.length) {
-      contextInfo = docPhrases.slice(0, 2).join(' ');
-    } else if (businessContext.features && businessContext.features.length) {
-      // Или из последних коммитов feat
-      const featureTitles = businessContext.features.slice(0, 2).map(f => f.replace(/^feat(\(.*\))?:\s*/, ''));
-      if (featureTitles.length) {
-        contextInfo = `Недавно добавлены: ${featureTitles.join('; ')}.`;
-      }
+    if (phrases.length) {
+      contextInfo = phrases.slice(0, 2).join(' ');
     }
   }
 
-  // 4. Сборка описания в зависимости от тона
+  // Если нет документации, пробуем взять из коммитов
+  if (!contextInfo && businessContext && businessContext.features && businessContext.features.length) {
+    const featureTitles = businessContext.features.slice(0, 2).map(f => f.replace(/^feat(\(.*\))?:\s*/, ''));
+    if (featureTitles.length) {
+      contextInfo = `Недавно добавлены: ${featureTitles.join('; ')}.`;
+    }
+  }
+
+  // Сборка описания в зависимости от тона (без switch, оставлено как есть)
   let description = '';
   switch (tone) {
     case 'marketing':
-      // Энергичный, продающий, акцент на выгодах
       description = `${intro} `;
-      if (valueText) {
-        description += `Главная ценность: ${valueText}. `;
-      }
-      if (contextInfo) {
-        description += `${contextInfo} `;
-      }
+      if (valueText) description += `Главная ценность: ${valueText}. `;
+      if (contextInfo) description += `${contextInfo} `;
       description += `Этот инструмент создан для ${audienceLabel}, чтобы решать их задачи эффективно и просто. `;
       description += `Попробуйте прямо сейчас и убедитесь в его преимуществах.`;
       break;
 
     case 'minimal':
-      // Кратко, только суть
       description = `${intro}`;
-      if (valueText) {
-        description += ` Ценность: ${valueText}.`;
-      }
-      if (contextInfo) {
-        description += ` ${contextInfo}`;
-      }
+      if (valueText) description += ` Ценность: ${valueText}.`;
+      if (contextInfo) description += ` ${contextInfo}`;
       break;
 
     default: // technical
-      // Чётко, фактологично, нейтрально
       description = `${intro} `;
-      if (valueText) {
-        description += `Бизнес-ценность: ${valueText}. `;
-      }
-      if (audience) {
-        description += `Проект ориентирован на ${audienceLabel}. `;
-      }
-      if (contextInfo) {
-        description += `${contextInfo} `;
-      }
-      // Добавим пару слов о назначении
-      if (projectType === 'microservice') {
-        description += `Он предоставляет REST API и управление через CLI.`;
-      } else if (projectType === 'library') {
-        description += `Он предоставляет API для интеграции в ваши проекты.`;
-      } else if (projectType === 'cli') {
-        description += `Управление осуществляется через командную строку.`;
-      } else if (projectType === 'web') {
-        description += `Доступ к функциональности осуществляется через веб-интерфейс.`;
-      }
+      if (valueText) description += `Бизнес-ценность: ${valueText}. `;
+      if (audience) description += `Проект ориентирован на ${audienceLabel}. `;
+      if (contextInfo) description += `${contextInfo} `;
+      if (projectType === 'microservice') description += `Он предоставляет REST API и управление через CLI.`;
+      else if (projectType === 'library') description += `Он предоставляет API для интеграции в ваши проекты.`;
+      else if (projectType === 'cli') description += `Управление осуществляется через командную строку.`;
+      else if (projectType === 'web') description += `Доступ к функциональности осуществляется через веб-интерфейс.`;
       break;
   }
 
@@ -303,7 +381,7 @@ function buildDescription({ projectName, stack, interactiveAnswers, businessCont
 
 /**
  * Формирует список ключевых возможностей.
- * Сначала идут пользовательские, потом автоматические (без дублирования).
+ * (без изменений)
  */
 function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
   const userFeatures = [];
@@ -320,10 +398,8 @@ function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
   if (flatFiles.has('Dockerfile') || flatFiles.has('docker-compose.yml')) autoFeatures.push('🐳 Контейнеризация (Docker)');
   if (flatFiles.has('.github/workflows') || flatFiles.has('.gitlab-ci.yml')) autoFeatures.push('⚙️ CI/CD');
 
-  // Удаляем дубли (по смыслу, не по строке)
   const all = [...userFeatures];
   for (const af of autoFeatures) {
-    // Проверяем, есть ли уже похожая функция (упрощённо – по ключевому слову)
     const words = af.split(' ');
     const keyword = words.slice(1).join(' ').toLowerCase().replace(/[^a-z0-9]/g, '');
     const exists = all.some(f => {
@@ -333,7 +409,6 @@ function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
     if (!exists) all.push(af);
   }
 
-  // Если ничего не добавлено, добавляем стандартные
   if (all.length === 0) {
     all.push('📁 Структурированный код');
     all.push('📦 Управление зависимостями');
@@ -343,12 +418,11 @@ function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
 }
 
 /**
- * Формирует раздел «Быстрый старт» с подробными инструкциями и пояснениями.
+ * Формирует раздел «Быстрый старт».
+ * (без изменений)
  */
 function buildQuickStart({ stack }) {
   const lines = [];
-
-  // Требования
   lines.push('');
   lines.push('### Требования');
   lines.push('');
@@ -359,7 +433,6 @@ function buildQuickStart({ stack }) {
   }
   lines.push('');
 
-  // Установка и запуск
   lines.push('### Установка и запуск');
   lines.push('');
   lines.push('```bash');
@@ -378,7 +451,6 @@ function buildQuickStart({ stack }) {
   lines.push('```');
   lines.push('');
 
-  // Пояснение
   lines.push('> ℹ️  Подробные инструкции могут отличаться в зависимости от вашего окружения.');
   lines.push('> Если у вас возникли проблемы, обратитесь к официальной документации.');
 
@@ -386,7 +458,8 @@ function buildQuickStart({ stack }) {
 }
 
 /**
- * Строит текстовый контекст для AI-генерации (оставлено без изменений).
+ * Строит текстовый контекст для AI-генерации.
+ * (без изменений)
  */
 function buildContextString({ projectName, tree, manifest, mainFile, businessContext, interactiveAnswers, stack, codeContext }) {
   const parts = [];

@@ -8,6 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 const { log } = require('./logger');
+const { isSensitive, maskSensitive } = require('./utils/sensitive');
+const { resolveSafePath } = require('./utils/pathUtils');
 
 // Папки, которые стоит обойти для поиска кода
 const CODE_PATHS = ['src', 'lib', 'app', 'models', 'controllers', 'services', 'utils', 'core', 'internal', 'components', 'pages', 'hooks', 'helpers', 'modules'];
@@ -31,12 +33,15 @@ function collectCodeContext(rootDir, flatFiles, mainFile) {
 
   // 1) Сам главный файл (если есть)
   if (mainFile && mainFile.name) {
-    const absPath = path.join(rootDir, mainFile.name);
-    if (fs.existsSync(absPath)) {
-      candidates.push({ rel: mainFile.name, priority: 0 });
+    try {
+      const absPath = resolveSafePath(rootDir, mainFile.name);
+      if (fs.existsSync(absPath)) {
+        candidates.push({ rel: mainFile.name, priority: 0 });
+      }
+    } catch (err) {
+      log.debug(`Пропуск главного файла из-за ошибки безопасности: ${err.message}`);
     }
   }
-
   // 2) Другие файлы: проходим по плоскому списку и выбираем те, что лежат в CODE_PATHS
   const fileList = Array.from(flatFiles);
   for (const rel of fileList) {
@@ -61,24 +66,17 @@ function collectCodeContext(rootDir, flatFiles, mainFile) {
 
   let result = '';
   for (const { rel } of selected) {
-    const absPath = path.join(rootDir, rel);
     try {
-      const content = fs.readFileSync(absPath, 'utf8');
-      const lines = content.split(/\r?\n/);
+      const absPath = resolveSafePath(rootDir, rel);
+      const content = fs.readFileSync(absPath, 'utf8');      const maskedContent = maskSensitive(content);
+      const lines = maskedContent.split(/\r?\n/);
       const limited = lines.slice(0, MAX_LINES_PER_FILE);
 
-      // Пытаемся вычленить полезные элементы:
-      // - комментарии (однострочные и многострочные)
-      // - объявления функций/классов (зависит от языка, но общий подход)
-      // Для простоты соберём всё, но можно отфильтровать пустые строки и строки без кода
       let filtered = [];
-      let inMultilineComment = false;
       for (const line of limited) {
         const trimmed = line.trim();
-        // Пропускаем слишком длинные строки (технические)
         if (trimmed.length > 300) continue;
 
-        // Если строка содержит комментарий или сигнатуру функции/класса
         const isComment = /^\s*\/\//.test(line) || /^\s*#/.test(line) || /^\s*\/\*/.test(line) || /^\s*\*/.test(line);
         const isDeclaration = /^\s*(export\s+)?(function|class|interface|type|enum|const|let|var|def|pub\s+fn|public\s+class|public\s+function|public\s+static|async\s+function|private\s+|protected\s+)/i.test(line);
 
@@ -86,7 +84,6 @@ function collectCodeContext(rootDir, flatFiles, mainFile) {
           filtered.push(trimmed);
         }
       }
-
       if (filtered.length > 0) {
         result += `\n--- Файл: ${rel} ---\n`;
         result += filtered.join('\n');

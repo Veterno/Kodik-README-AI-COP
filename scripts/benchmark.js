@@ -18,15 +18,23 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { AiClient } = require('../src/aiClient');
+const { validateReadme } = require('../src/validator');
+const { scanProject } = require('../src/scanner');
+const { findMainFile } = require('../src/mainFile');
+const { collectBusinessContext } = require('../src/contextCollector');
+const { collectCodeContext } = require('../src/codeContext');
+const { detectStack } = require('../src/stackDetector');
 
-// Список репозиториев (пример)
+require('dotenv').config();
+
+// Список репозиториев для тестирования
 const REPOS = [
   'https://github.com/expressjs/express.git',
-  'https://github.com/django/django.git',
-  'https://github.com/golang/go.git',
-  'https://github.com/rust-lang/rust.git',
-  'https://github.com/spring-projects/spring-boot.git',
-  // ... добавить ещё 25
+  'https://github.com/lucia-auth/lucia.git',
+  'https://github.com/pnpm/pnpm.git',
+  'https://github.com/fastify/fastify.git',
+  'https://github.com/honojs/hono.git'
 ];
 
 const TEMP_DIR = path.join(__dirname, '../.benchmark-temp');
@@ -39,73 +47,114 @@ function ensureDir(dir) {
 function cloneRepo(repoUrl, dest) {
   if (!fs.existsSync(dest)) {
     console.log(`Клонирую ${repoUrl}...`);
-    execSync(`git clone ${repoUrl} ${dest}`, { stdio: 'ignore' });
+    execSync(`git clone --depth 1 ${repoUrl} ${dest}`, { stdio: 'ignore' });
   } else {
     console.log(`Обновляю ${dest}...`);
-    execSync(`git -C ${dest} pull`, { stdio: 'ignore' });
+    try {
+      execSync(`git -C ${dest} pull`, { stdio: 'ignore' });
+    } catch (e) {
+      console.warn(`Не удалось обновить ${dest}, использую текущую версию.`);
+    }
   }
 }
 
 function runGenerator(projectDir) {
   const cwd = process.cwd();
-  process.chdir(projectDir);
   try {
-    // Предполагаем, что генератор установлен глобально или доступен по пути
-    const output = execSync('node ../src/index.js --non-interactive', { encoding: 'utf8', stdio: 'pipe' });
-    return output;
+    // Запускаем через node напрямую
+    const indexScript = path.join(__dirname, '../src/index.js');
+    execSync(`node ${indexScript} ${projectDir} --non-interactive`, { stdio: 'inherit' });
+    return true;
   } catch (err) {
     console.error(`Ошибка при генерации для ${projectDir}: ${err.message}`);
-    return null;
-  } finally {
-    process.chdir(cwd);
+    return false;
   }
 }
 
-function validateReadme(projectDir, generatedReadmePath) {
-  // TODO: реализовать LLM-as-a-Judge
-  // Отправить контекст (дерево, манифест, бизнес-контекст) + сгенерированный README
-  // Получить оценки (JSON) и сохранить
-  console.log(`Валидация для ${projectDir} пока не реализована.`);
-  return { accuracy: 0, clarity: 0, business: 0, hallucinations: 0 };
+/**
+ * Собирает контекст аналогично основному процессу для передачи в валидатор
+ */
+function getProjectContext(targetDir) {
+  const scanResult = scanProject(targetDir);
+  const { tree, flatFiles, manifests, docs } = scanResult;
+  const manifest = manifests.length > 0 ? manifests[0] : null;
+  const mainFile = findMainFile(targetDir, manifest, flatFiles);
+  const businessContext = collectBusinessContext(targetDir, docs);
+  const codeContext = collectCodeContext(targetDir, flatFiles, mainFile);
+  const stack = detectStack(manifest, flatFiles);
+
+  return `Project: ${path.basename(targetDir)}
+Stack: ${JSON.stringify(stack)}
+Structure:
+${tree}
+Code Context:
+${codeContext}`;
 }
 
-function main() {
-  ensureDir(TEMP_DIR);
-  ensureDir(RESULTS_DIR);
+async function main() {
+  if (!process.env.OPENAI_API_KEY && !process.env.USE_AI === 'false') {
+    console.warn('\x1b[33mПредупреждение: OPENAI_API_KEY не найден. Бенчмарк будет запущен в ограниченном режиме (без AI-валидации).\x1b[0m');
+  }
+
+  ensureDir(TEMP_DIR);  ensureDir(RESULTS_DIR);
+
+  const summary = [];
 
   for (const repo of REPOS) {
     const name = path.basename(repo, '.git');
     const dest = path.join(TEMP_DIR, name);
+    
+    console.log(`\n=== Тестирование: ${name} ===`);
     cloneRepo(repo, dest);
 
-    console.log(`Генерация README для ${name}...`);
-    const output = runGenerator(dest);
-    if (output) {
+    console.log(`Генерация README...`);
+    const success = runGenerator(dest);
+    
+    if (success) {
       const generatedReadmePath = path.join(dest, 'README.md');
       if (fs.existsSync(generatedReadmePath)) {
-        // Копируем результат в папку с результатами
-        const target = path.join(RESULTS_DIR, `${name}.generated.md`);
-        fs.copyFileSync(generatedReadmePath, target);
+        const markdown = fs.readFileSync(generatedReadmePath, 'utf8');
+        
+        // Сохраняем результат
+        fs.writeFileSync(path.join(RESULTS_DIR, `${name}.generated.md`), markdown);
 
-        // Проверяем, есть ли оригинальный README
-        const originalPath = path.join(dest, 'README.original.md');
-        if (fs.existsSync(originalPath)) {
-          fs.copyFileSync(originalPath, path.join(RESULTS_DIR, `${name}.original.md`));
-        }
-
-        // Валидация
-        const scores = validateReadme(dest, generatedReadmePath);
+        console.log(`Валидация через LLM...`);
+        const context = getProjectContext(dest);
+        const validation = await validateReadme(markdown, context);
+        
         fs.writeFileSync(
           path.join(RESULTS_DIR, `${name}.scores.json`),
-          JSON.stringify(scores, null, 2)
+          JSON.stringify(validation, null, 2)
         );
+
+        console.log(`Результаты для ${name}:`, validation.scores);
+        summary.push({ name, ...validation.scores });
       }
     }
   }
 
-  console.log('Бенчмаркинг завершён.');
+  // Итоговый отчет
+  if (summary.length > 0) {
+    const avg = (key) => (summary.reduce((a, b) => a + b[key], 0) / summary.length).toFixed(2);
+    const report = {
+      date: new Date().toISOString(),
+      average: {
+        accuracy: avg('accuracy'),
+        clarity: avg('clarity'),
+        completeness: avg('completeness'),
+        hallucinations: avg('hallucinations')
+      },
+      details: summary
+    };
+    
+    fs.writeFileSync(path.join(RESULTS_DIR, 'summary.json'), JSON.stringify(report, null, 2));
+    console.log('\n=== ИТОГОВЫЙ ОТЧЕТ ===');
+    console.table(report.average);
+  }
+
+  console.log('\nБенчмаркинг завершён. Результаты в .benchmark-results/');
 }
 
 if (require.main === module) {
-  main();
+  main().catch(console.error);
 }
