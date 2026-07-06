@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Автоматическая генерация README.md с использованием OpenAI-совместимых API и анализом контекста (локальный fallback)",
   "main": "src/index.js",
+  "bin": {
+    "kodik-readme-ai": "src/index.js"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",

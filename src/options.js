@@ -5,22 +5,16 @@ const path = require('path');
 const yaml = require('js-yaml');
 const { DEFAULT_ANSWERS, TRANSLATION_CONFIG, AI_CONFIG } = require('./config');
 
-/**
- * Объединяет настройки из разных источников с учетом приоритета:
- * 1. CLI аргументы
- * 2. Файл конфигурации (--config)
- * 3. Переменные окружения (.env)
- * 4. Значения по умолчанию
- */
 function resolveOptions(argv) {
   const configFromFile = loadConfigFile(argv.config);
 
-  // Приоритет для целевой папки: позиционный аргумент > --target > env > cwd
   const targetDir = path.resolve(
     argv._[0] || argv.target || process.env.TARGET_DIR || process.cwd()
   );
 
-  // Формируем итоговый объект опций
+  // --- Определяем основной язык из --language, переменных или дефолта ---
+  const mainLanguage = argv.language || process.env.LANGUAGE || 'ru';
+
   const options = {
     target: targetDir,
     output: path.resolve(targetDir, argv.output || configFromFile.output || '.'),
@@ -29,7 +23,6 @@ function resolveOptions(argv) {
     validate: argv.validate || configFromFile.validate || false,
     projectName: argv.projectName || configFromFile.projectName || null,
     
-    // Настройки AI
     ai: {
       enabled: argv.ai !== undefined ? argv.ai : (configFromFile.ai?.enabled !== undefined ? configFromFile.ai.enabled : (process.env.USE_AI !== 'false')),
       model: argv.model || configFromFile.ai?.model || process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -37,16 +30,18 @@ function resolveOptions(argv) {
       apiUrl: argv.apiUrl || configFromFile.ai?.apiUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
     },
 
-    // Настройки контента
     content: {
       tone: argv.tone || configFromFile.content?.tone || DEFAULT_ANSWERS.tone,
-      generationLanguage: argv.generationLanguage || configFromFile.content?.generationLanguage || process.env.GENERATION_LANGUAGE || 'ru',
-      targetLanguage: argv.targetLanguage || configFromFile.content?.targetLanguage || TRANSLATION_CONFIG.TARGET_LANGUAGE || 'ru',
+      // Язык генерации: если задан --generation-language, иначе из конфига, иначе из переменной, иначе основной язык
+      generationLanguage: argv.generationLanguage || configFromFile.content?.generationLanguage || process.env.GENERATION_LANGUAGE || mainLanguage,
+      // Целевой язык перевода: аналогично
+      targetLanguage: argv.targetLanguage || configFromFile.content?.targetLanguage || process.env.TARGET_LANGUAGE || mainLanguage,
       noTranslate: argv.noTranslate || configFromFile.content?.noTranslate || !TRANSLATION_CONFIG.ENABLED,
       translateSections: argv.translateSection || configFromFile.content?.translateSections || TRANSLATION_CONFIG.SECTIONS,
+      // Явное поле language для finalScan (используется в finalScanner.js)
+      language: argv.targetLanguage || configFromFile.content?.targetLanguage || process.env.TARGET_LANGUAGE || mainLanguage,
     },
 
-    // Интерактивные ответы (начальные значения)
     answers: {
       ...DEFAULT_ANSWERS,
       ...(configFromFile.answers || {}),

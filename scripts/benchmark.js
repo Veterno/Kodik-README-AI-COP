@@ -28,6 +28,13 @@ const { detectStack } = require('../src/stackDetector');
 
 require('dotenv').config();
 
+// --- Проверка наличия API-ключа для валидации ---
+if (!process.env.OPENAI_API_KEY && process.env.USE_AI !== 'false') {
+  console.error('\x1b[31mОшибка: OPENAI_API_KEY не задан. Бенчмарк не может выполнить валидацию.\x1b[0m');
+  console.error('Установите переменную OPENAI_API_KEY или отключите AI через USE_AI=false');
+  process.exit(1); // Явный выход с ошибкой для CI
+}
+
 // Список репозиториев для тестирования
 const REPOS = [
   'https://github.com/expressjs/express.git',
@@ -61,7 +68,6 @@ function cloneRepo(repoUrl, dest) {
 function runGenerator(projectDir) {
   const cwd = process.cwd();
   try {
-    // Запускаем через node напрямую
     const indexScript = path.join(__dirname, '../src/index.js');
     execSync(`node ${indexScript} ${projectDir} --non-interactive`, { stdio: 'inherit' });
     return true;
@@ -71,9 +77,6 @@ function runGenerator(projectDir) {
   }
 }
 
-/**
- * Собирает контекст аналогично основному процессу для передачи в валидатор
- */
 function getProjectContext(targetDir) {
   const scanResult = scanProject(targetDir);
   const { tree, flatFiles, manifests, docs } = scanResult;
@@ -92,11 +95,8 @@ ${codeContext}`;
 }
 
 async function main() {
-  if (!process.env.OPENAI_API_KEY && !process.env.USE_AI === 'false') {
-    console.warn('\x1b[33mПредупреждение: OPENAI_API_KEY не найден. Бенчмарк будет запущен в ограниченном режиме (без AI-валидации).\x1b[0m');
-  }
-
-  ensureDir(TEMP_DIR);  ensureDir(RESULTS_DIR);
+  ensureDir(TEMP_DIR);
+  ensureDir(RESULTS_DIR);
 
   const summary = [];
 
@@ -114,8 +114,6 @@ async function main() {
       const generatedReadmePath = path.join(dest, 'README.md');
       if (fs.existsSync(generatedReadmePath)) {
         const markdown = fs.readFileSync(generatedReadmePath, 'utf8');
-        
-        // Сохраняем результат
         fs.writeFileSync(path.join(RESULTS_DIR, `${name}.generated.md`), markdown);
 
         console.log(`Валидация через LLM...`);
@@ -133,7 +131,6 @@ async function main() {
     }
   }
 
-  // Итоговый отчет
   if (summary.length > 0) {
     const avg = (key) => (summary.reduce((a, b) => a + b[key], 0) / summary.length).toFixed(2);
     const report = {
