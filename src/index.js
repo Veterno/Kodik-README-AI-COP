@@ -4,9 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
-const yargs = require('yargs/yargs');
+const yargs = require('yargs');
 const { hideBin } = require('yargs/helpers');
-
 require('dotenv').config();
 
 const { log, initLogger, closeLogger } = require('./logger');
@@ -22,10 +21,10 @@ const { validateReadme } = require('./validator');
 const { resolveOptions } = require('./options');
 const pkg = require('../package.json');
 
-async function main() {
+async function main(customArgv) {
   initLogger();
 
-  const argv = yargs(hideBin(process.argv))
+  const argv = customArgv || yargs(hideBin(process.argv))
     .usage('Использование: $0 [target] [options]')
     .positional('target', {
       describe: 'Путь к проекту (целевая директория)',
@@ -223,14 +222,13 @@ async function main() {
 
   // 7. Финальный сканер (перевод)
   if (!options.content.noTranslate) {
-    log.step(`Финальная обработка (перевод на ${options.content.language})…`);
+    log.step(`Финальная обработка (перевод на ${options.content.targetLanguage})…`);
     try {
       markdown = await finalScan(markdown, options);
     } catch (err) {
       log.warn(`Ошибка в финальном сканере: ${err.message}`);
     }
   }
-
   // 8. Сохранение
   if (options.dryRun) {
     console.log('\n--- DRY RUN: Содержимое README.md ---\n');
@@ -289,8 +287,12 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-main().catch(err => {
-  log.error('Критическая ошибка в главном цикле', err);
-  closeLogger();
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    log.error('Критическая ошибка в главном цикле', err);
+    closeLogger();
+    process.exit(1);
+  });
+}
+
+module.exports = { main };

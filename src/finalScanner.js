@@ -14,7 +14,7 @@ const { TRANSLATION_CONFIG } = require('./config');
  * Основная функция финального сканирования.
  */
 async function finalScan(markdown, options) {
-  const { language: TARGET_LANGUAGE, translateSections: SECTIONS, noTranslate } = options.content;
+  const { targetLanguage: TARGET_LANGUAGE, translateSections: SECTIONS, noTranslate } = options.content;
   const SKIP_IF_SHORT = TRANSLATION_CONFIG.SKIP_IF_SHORT;
   
   if (noTranslate) return markdown;
@@ -50,10 +50,9 @@ async function finalScan(markdown, options) {
       }
 
       // Определяем, нужно ли переводить
-      // ИСПРАВЛЕНО: если перевод включен, переводим всегда, когда раздел не пустой и не короткий
-      const forceTranslate = options.content?.forceTranslate || true;
-      if (forceTranslate || shouldTranslate(content, TARGET_LANGUAGE)) {
-        log.info(`Обнаружен текст на иностранном языке в разделе "${sectionName}", перевод на ${TARGET_LANGUAGE}...`);
+      // Если forceTranslate не задан, используем эвристику shouldTranslate
+      const forceTranslate = options.content?.forceTranslate ?? false;
+      if (forceTranslate || shouldTranslate(content, TARGET_LANGUAGE)) {        log.info(`Обнаружен текст на иностранном языке в разделе "${sectionName}", перевод на ${TARGET_LANGUAGE}...`);
         try {
           const translated = await translateToLanguage(client, content, TARGET_LANGUAGE);
           if (translated && translated !== content) {

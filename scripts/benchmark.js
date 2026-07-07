@@ -1,24 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-/**
- * scripts/benchmark.js
- * Бенчмаркинг — запуск генерации на наборе репозиториев и оценка качества
- * с помощью LLM-as-a-Judge.
- *
- * Требуется: список репозиториев для клонирования (или локальные пути).
- * Для каждого:
- *   - клонируем/обновляем
- *   - запускаем генератор с --non-interactive
- *   - сохраняем сгенерированный README и оригинальный (если есть)
- *   - отправляем пару (контекст + сгенерированный README) в LLM-валидатор
- *   - собираем оценки
- */
-
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { AiClient } = require('../src/aiClient');
+const pLimit = require('p-limit');
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
 const { validateReadme } = require('../src/validator');
 const { scanProject } = require('../src/scanner');
 const { findMainFile } = require('../src/mainFile');
@@ -28,15 +16,27 @@ const { detectStack } = require('../src/stackDetector');
 
 require('dotenv').config();
 
-// --- Проверка наличия API-ключа для валидации ---
-if (!process.env.OPENAI_API_KEY && process.env.USE_AI !== 'false') {
-  console.error('\x1b[31mОшибка: OPENAI_API_KEY не задан. Бенчмарк не может выполнить валидацию.\x1b[0m');
-  console.error('Установите переменную OPENAI_API_KEY или отключите AI через USE_AI=false');
-  process.exit(1); // Явный выход с ошибкой для CI
-}
+const argv = yargs(hideBin(process.argv))
+  .option('models', {
+    alias: 'm',
+    type: 'string',
+    description: 'Список моделей через запятую',
+    default: process.env.AI_MODEL || 'gpt-4o-mini'
+  })
+  .option('concurrency', {
+    alias: 'c',
+    type: 'number',
+    description: 'Количество параллельных задач',
+    default: 3
+  })
+  .option('repos', {
+    alias: 'r',
+    type: 'string',
+    description: 'Список репозиториев через запятую (URL)'
+  })
+  .argv;
 
-// Список репозиториев для тестирования
-const REPOS = [
+const REPOS = argv.repos ? argv.repos.split(',') : [
   'https://github.com/expressjs/express.git',
   'https://github.com/lucia-auth/lucia.git',
   'https://github.com/pnpm/pnpm.git',
@@ -44,6 +44,7 @@ const REPOS = [
   'https://github.com/honojs/hono.git'
 ];
 
+const MODELS = argv.models.split(',');
 const TEMP_DIR = path.join(__dirname, '../.benchmark-temp');
 const RESULTS_DIR = path.join(__dirname, '../.benchmark-results');
 
@@ -51,105 +52,144 @@ function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-function cloneRepo(repoUrl, dest) {
-  if (!fs.existsSync(dest)) {
-    console.log(`Клонирую ${repoUrl}...`);
-    execSync(`git clone --depth 1 ${repoUrl} ${dest}`, { stdio: 'ignore' });
-  } else {
-    console.log(`Обновляю ${dest}...`);
-    try {
-      execSync(`git -C ${dest} pull`, { stdio: 'ignore' });
-    } catch (e) {
-      console.warn(`Не удалось обновить ${dest}, использую текущую версию.`);
-    }
+function getCommitHash(repoPath) {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: repoPath, encoding: 'utf8' }).trim();
+  } catch {
+    return 'unknown';
   }
 }
 
-function runGenerator(projectDir) {
-  const cwd = process.cwd();
+async function cloneRepo(repoUrl, dest) {
   try {
-    const indexScript = path.join(__dirname, '../src/index.js');
-    execSync(`node ${indexScript} ${projectDir} --non-interactive`, { stdio: 'inherit' });
+    if (!fs.existsSync(dest)) {
+      console.log(`[CLONE] ${repoUrl}...`);
+      execSync(`git clone --depth 1 ${repoUrl} ${dest}`, { stdio: 'ignore' });
+    } else {
+      console.log(`[UPDATE] ${dest}...`);
+      execSync(`git -C ${dest} pull`, { stdio: 'ignore' });
+    }
     return true;
   } catch (err) {
-    console.error(`Ошибка при генерации для ${projectDir}: ${err.message}`);
+    console.error(`[ERROR] Не удалось клонировать ${repoUrl}: ${err.message}`);
     return false;
+  }
+}
+
+function runGenerator(projectDir, model) {
+  const start = Date.now();
+  try {
+    const indexScript = path.join(__dirname, '../src/index.js');
+    // Передаем модель через переменную окружения для дочернего процесса
+    const env = { ...process.env, AI_MODEL: model };
+    const result = spawnSync('node', [indexScript, projectDir, '--non-interactive'], { 
+      env,
+      encoding: 'utf8',
+      timeout: 300000 // 5 минут
+    });
+    
+    if (result.status !== 0) {
+      throw new Error(result.stderr || 'Unknown error');
+    }
+    
+    return { success: true, duration: Date.now() - start };
+  } catch (err) {
+    console.error(`[ERROR] Генерация (${model}) для ${projectDir}: ${err.message}`);
+    return { success: false, duration: Date.now() - start, error: err.message };
   }
 }
 
 function getProjectContext(targetDir) {
   const scanResult = scanProject(targetDir);
-  const { tree, flatFiles, manifests, docs } = scanResult;
+  const { tree, flatFiles, manifests } = scanResult;
   const manifest = manifests.length > 0 ? manifests[0] : null;
   const mainFile = findMainFile(targetDir, manifest, flatFiles);
-  const businessContext = collectBusinessContext(targetDir, docs);
   const codeContext = collectCodeContext(targetDir, flatFiles, mainFile);
   const stack = detectStack(manifest, flatFiles);
 
-  return `Project: ${path.basename(targetDir)}
-Stack: ${JSON.stringify(stack)}
-Structure:
-${tree}
-Code Context:
-${codeContext}`;
+  return `Project: ${path.basename(targetDir)}\nStack: ${JSON.stringify(stack)}\nStructure:\n${tree}\nCode Context:\n${codeContext}`;
+}
+
+async function runBenchmarkForRepo(repoUrl, model) {
+  const name = path.basename(repoUrl, '.git');
+  const dest = path.join(TEMP_DIR, name);
+  
+  if (!await cloneRepo(repoUrl, dest)) return null;
+
+  console.log(`[RUN] ${name} | Model: ${model}`);
+  const genResult = runGenerator(dest, model);
+  
+  if (!genResult.success) return { repoName: name, model, success: false, error: genResult.error };
+
+  const readmePath = path.join(dest, 'README.md');
+  if (!fs.existsSync(readmePath)) return { repoName: name, model, success: false, error: 'README.md not generated' };
+
+  const markdown = fs.readFileSync(readmePath, 'utf8');
+  const commitHash = getCommitHash(dest);
+
+  // Валидация
+  const valStart = Date.now();
+  const context = getProjectContext(dest);
+  const validation = await validateReadme(markdown, context);
+  const valDuration = Date.now() - valStart;
+
+  // Сохраняем индивидуальный результат
+  const resultId = `${name}-${model}-${Date.now()}`;
+  const resultFile = path.join(RESULTS_DIR, `${resultId}.json`);
+  const resultData = {
+    repoName: name,
+    repoUrl,
+    commitHash,
+    model,
+    generationTimeMs: genResult.duration,
+    validationTimeMs: valDuration,
+    scores: validation.scores,
+    feedback: validation.feedback,
+    timestamp: new Date().toISOString()
+  };
+
+  fs.writeFileSync(resultFile, JSON.stringify(resultData, null, 2));
+  // Также сохраняем сам README для истории
+  fs.writeFileSync(path.join(RESULTS_DIR, `${resultId}.md`), markdown);
+
+  return { ...resultData, success: true };
 }
 
 async function main() {
   ensureDir(TEMP_DIR);
   ensureDir(RESULTS_DIR);
 
-  const summary = [];
+  const limit = pLimit(argv.concurrency);
+  const tasks = [];
 
-  for (const repo of REPOS) {
-    const name = path.basename(repo, '.git');
-    const dest = path.join(TEMP_DIR, name);
-    
-    console.log(`\n=== Тестирование: ${name} ===`);
-    cloneRepo(repo, dest);
-
-    console.log(`Генерация README...`);
-    const success = runGenerator(dest);
-    
-    if (success) {
-      const generatedReadmePath = path.join(dest, 'README.md');
-      if (fs.existsSync(generatedReadmePath)) {
-        const markdown = fs.readFileSync(generatedReadmePath, 'utf8');
-        fs.writeFileSync(path.join(RESULTS_DIR, `${name}.generated.md`), markdown);
-
-        console.log(`Валидация через LLM...`);
-        const context = getProjectContext(dest);
-        const validation = await validateReadme(markdown, context);
-        
-        fs.writeFileSync(
-          path.join(RESULTS_DIR, `${name}.scores.json`),
-          JSON.stringify(validation, null, 2)
-        );
-
-        console.log(`Результаты для ${name}:`, validation.scores);
-        summary.push({ name, ...validation.scores });
-      }
+  for (const model of MODELS) {
+    for (const repo of REPOS) {
+      tasks.push(limit(() => runBenchmarkForRepo(repo, model)));
     }
   }
 
-  if (summary.length > 0) {
-    const avg = (key) => (summary.reduce((a, b) => a + b[key], 0) / summary.length).toFixed(2);
-    const report = {
-      date: new Date().toISOString(),
-      average: {
-        accuracy: avg('accuracy'),
-        clarity: avg('clarity'),
-        completeness: avg('completeness'),
-        hallucinations: avg('hallucinations')
-      },
-      details: summary
-    };
-    
-    fs.writeFileSync(path.join(RESULTS_DIR, 'summary.json'), JSON.stringify(report, null, 2));
-    console.log('\n=== ИТОГОВЫЙ ОТЧЕТ ===');
-    console.table(report.average);
-  }
+  console.log(`Запуск бенчмарка: ${REPOS.length} репозиториев, ${MODELS.length} моделей, параллелизм: ${argv.concurrency}`);
+  
+  const results = (await Promise.all(tasks)).filter(r => r !== null);
+  
+  const summaryPath = path.join(RESULTS_DIR, `run-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+  const summary = {
+    timestamp: new Date().toISOString(),
+    config: { models: MODELS, repos: REPOS },
+    results
+  };
 
-  console.log('\nБенчмаркинг завершён. Результаты в .benchmark-results/');
+  fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  
+  console.log(`\nБенчмарк завершен. Результаты сохранены в ${summaryPath}`);
+  
+  // Вызов генератора отчетов
+  try {
+    const reportGenerator = require('./reportGenerator');
+    reportGenerator.generate(summaryPath);
+  } catch (err) {
+    console.error('Ошибка при генерации HTML-отчета:', err.message);
+  }
 }
 
 if (require.main === module) {

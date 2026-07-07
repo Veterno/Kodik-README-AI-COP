@@ -71,5 +71,37 @@ describe('FinalScanner Module', () => {
     expect(result).toBe(markdown);
     expect(AiClient.prototype.chat).not.toHaveBeenCalled();
   });
-});
 
+  test('should translate when target is en and content is cyrillic', async () => {
+    const options = {
+      ...mockOptions,
+      content: { ...mockOptions.content, targetLanguage: 'en', translateSections: ['Description'] }
+    };
+    // Сделаем текст длиннее 20 слов
+    const longCyrillic = 'Это длинный русский текст, который содержит более двадцати слов для того, чтобы пройти проверку на минимальную длину раздела в финальном сканере документации проекта.';
+    const markdown = `## Description\n\n${longCyrillic}`;
+    AiClient.prototype.chat.mockResolvedValue('This is Russian text translated to English.');
+
+    const result = await finalScan(markdown, options);
+    expect(result).toContain('This is Russian text translated to English.');
+  });
+
+  test('should translate for unknown target languages', async () => {
+    const options = {
+      ...mockOptions,
+      content: { ...mockOptions.content, targetLanguage: 'fr', translateSections: ['Description'] }
+    };
+    // Сделаем текст длиннее 20 слов
+    const longText = 'This is a long English text that contains more than twenty words to pass the minimum section length check in the final scanner of the project documentation.';
+    const markdown = `## Description\n\n${longText}`;
+    AiClient.prototype.chat.mockResolvedValue('Texte traduit en français.');
+
+    const result = await finalScan(markdown, options);
+    expect(result).toContain('Texte traduit en français.');
+  });
+  test('should skip translation if text is too short for language detection', async () => {
+    const markdown = '## Описание\n\nShort';
+    const result = await finalScan(markdown, mockOptions);
+    expect(result).toBe(markdown);
+  });
+});

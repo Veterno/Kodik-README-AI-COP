@@ -98,6 +98,9 @@ class AiClient {
 
       return this._extractContent(response).trim();
     } catch (err) {
+      const errorData = err.response?.data;
+      const errorMessage = errorData ? (typeof errorData === 'object' ? JSON.stringify(errorData) : errorData) : err.message;
+
       // Обработка ошибки неподдерживаемого параметра response_format
       if (err.response && err.response.status === 400 && useResponseFormat) {
         log.warn(`Провайдер ${this.provider} не поддерживает response_format. Пробую без него...`);
@@ -107,16 +110,15 @@ class AiClient {
       if (retryCount < this.maxRetries) {
         const nextRetry = retryCount + 1;
         const waitTime = Math.pow(2, nextRetry) * 1000;
-        log.warn(`Ошибка AI (${err.message}). Попытка ${nextRetry}/${this.maxRetries} через ${waitTime}ms...`);
+        log.warn(`Ошибка AI (${errorMessage}). Попытка ${nextRetry}/${this.maxRetries} через ${waitTime}ms...`);
         await new Promise(r => setTimeout(r, waitTime));
         return this.chat(messages, { ...options, retryCount: nextRetry });
       }
 
-      log.error(`Критическая ошибка AI после ${retryCount} попыток: ${err.message}`);
-      throw err;
+      log.error(`Критическая ошибка AI после ${retryCount} попыток: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
   }
-
   /**
    * Генерация README с гарантированным получением JSON.
    */
