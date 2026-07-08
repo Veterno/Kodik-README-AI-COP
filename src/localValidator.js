@@ -44,7 +44,7 @@ function validateLocal(markdown, options = {}) {
       });
     } else {
       // Если раздел есть, проверяем его содержимое на пустоту
-      const contentRegex = new RegExp(`^##\\s+(?:${escapedEmoji}\\s*)?${escapedTitle}[\\r\\n]*([\\s\\S]*?)(?=\\n##|$)`, 'im');
+      const contentRegex = new RegExp(`^##\\s+(?:${escapedEmoji}\\s*)?${escapedTitle}.*\\n?([\\s\\S]*?)(?=\\r?\\n##|$)`, 'im');
       const match = markdown.match(contentRegex);
       if (match) {
         const content = match[1].trim();      if (!content) {
@@ -67,19 +67,32 @@ function validateLocal(markdown, options = {}) {
   }
 
   // 2. Проверка ссылок
-  const urlRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
-  while ((match = urlRegex.exec(markdown)) !== null) {
+  while ((match = linkRegex.exec(markdown)) !== null) {
     const url = match[2];
-    // Простая проверка формата URL
-    try {
-      new URL(url);
-    } catch (e) {
-      warnings.push({
-        type: 'invalid_link',
-        link: url,
-        message: `Возможно, невалидная ссылка: ${url}`
-      });
+    // Если это не якорь (#anchor) и не относительный путь (./path или ../path)
+    if (!url.startsWith('#') && !url.startsWith('.') && !url.includes('/')) {
+      // Проверяем, похоже ли это на URL
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        warnings.push({
+          type: 'invalid_link',
+          link: url,
+          message: `Возможно, невалидная ссылка: ${url}`
+        });
+      }
+    }
+    
+    if (url.startsWith('http')) {
+      try {
+        new URL(url);
+      } catch (e) {
+        warnings.push({
+          type: 'invalid_link',
+          link: url,
+          message: `Некорректный формат URL: ${url}`
+        });
+      }
     }
   }
 

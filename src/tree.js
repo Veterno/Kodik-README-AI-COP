@@ -9,13 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const {
-  IGNORED_DIRS,
-  IGNORED_FILES,
-  MAX_TREE_DEPTH,
-  MAX_TREE_ENTRIES,
-  MAX_FILES_PER_DIR,
-} = require('./config');
+const config = require('./config');
 const { log } = require('./logger');
 
 function buildFileTree(rootDir) {
@@ -23,8 +17,8 @@ function buildFileTree(rootDir) {
   const counter = { value: 0 };
 
   function walk(dir, prefix, depth) {
-    if (depth > MAX_TREE_DEPTH) return;
-    if (counter.value >= MAX_TREE_ENTRIES) return;
+    if (depth > config.MAX_TREE_DEPTH) return;
+    if (counter.value >= config.MAX_TREE_ENTRIES) return;
 
     let entries;
     try {
@@ -38,9 +32,9 @@ function buildFileTree(rootDir) {
     const filtered = entries
       .filter((e) => {
         if (e.isDirectory()) {
-          return !IGNORED_DIRS.has(e.name) && !e.name.startsWith('.git');
+          return !config.IGNORED_DIRS.has(e.name) && !e.name.startsWith('.git');
         }
-        return !IGNORED_FILES.has(e.name);
+        return !config.IGNORED_FILES.has(e.name);
       })
       .sort((a, b) => {
         if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
@@ -55,12 +49,12 @@ function buildFileTree(rootDir) {
         try {
           subEntries = fs.readdirSync(fullPath, { withFileTypes: true })
             .filter(e => {
-              if (e.isDirectory()) return !IGNORED_DIRS.has(e.name) && !e.name.startsWith('.git');
-              return !IGNORED_FILES.has(e.name);
+              if (e.isDirectory()) return !config.IGNORED_DIRS.has(e.name) && !e.name.startsWith('.git');
+              return !config.IGNORED_FILES.has(e.name);
             });
         } catch { /* ignore */ }
         const count = subEntries.length;
-        return { entry, count, isBig: count > MAX_FILES_PER_DIR };
+        return { entry, count, isBig: count > config.MAX_FILES_PER_DIR };
       } else {
         return { entry, count: 0, isBig: false };
       }
@@ -68,14 +62,14 @@ function buildFileTree(rootDir) {
 
     // Выводим каждый элемент
     processed.forEach((item, idx) => {
-      if (counter.value >= MAX_TREE_ENTRIES) return;
+      if (counter.value >= config.MAX_TREE_ENTRIES) return;
       counter.value += 1;
 
       const isLast = idx === processed.length - 1;
       const connector = isLast ? '└── ' : '├── ';
       let name = item.entry.isDirectory() ? item.entry.name + '/' : item.entry.name;
       if (item.isBig) {
-        name += ` (${item.count} элементов)`;  // изменённый формат
+        name += ` (${item.count} элементов)`;
       }
       lines.push(prefix + connector + name);
 
@@ -89,8 +83,8 @@ function buildFileTree(rootDir) {
 
   walk(rootDir, '', 1);
 
-  if (counter.value >= MAX_TREE_ENTRIES) {
-    lines.push(`... (дерево обрезано, показано ${MAX_TREE_ENTRIES} записей)`);
+  if (counter.value >= config.MAX_TREE_ENTRIES) {
+    lines.push(`... (дерево обрезано, показано ${config.MAX_TREE_ENTRIES} записей)`);
   }
 
   return lines.join('\n');
@@ -101,8 +95,8 @@ function collectFlatFileList(rootDir) {
   const counter = { value: 0 };
 
   function walk(dir, rel, depth) {
-    if (depth > MAX_TREE_DEPTH) return;
-    if (counter.value >= MAX_TREE_ENTRIES) return;
+    if (depth > config.MAX_TREE_DEPTH) return;
+    if (counter.value >= config.MAX_TREE_ENTRIES) return;
 
     let entries;
     try {
@@ -112,14 +106,14 @@ function collectFlatFileList(rootDir) {
     }
 
     for (const entry of entries) {
-      if (counter.value >= MAX_TREE_ENTRIES) return;
+      if (counter.value >= config.MAX_TREE_ENTRIES) return;
       const name = entry.name;
 
       if (entry.isDirectory()) {
-        if (IGNORED_DIRS.has(name) || name.startsWith('.git')) continue;
+        if (config.IGNORED_DIRS.has(name) || name.startsWith('.git')) continue;
         walk(path.join(dir, name), rel ? rel + '/' + name : name, depth + 1);
       } else {
-        if (IGNORED_FILES.has(name)) continue;
+        if (config.IGNORED_FILES.has(name)) continue;
         counter.value += 1;
         result.add(rel ? rel + '/' + name : name);
       }
@@ -129,5 +123,4 @@ function collectFlatFileList(rootDir) {
   walk(rootDir, '', 1);
   return result;
 }
-
 module.exports = { buildFileTree, collectFlatFileList };

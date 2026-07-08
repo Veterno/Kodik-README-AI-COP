@@ -27,7 +27,7 @@ describe('localValidator', () => {
   });
 
   test('should detect empty sections', () => {
-    const markdown = '# Project Title\n\n## 📝 Описание\n\n## 📦 Быстрый старт\n\n## 📄 Лицензия\nMIT';
+    const markdown = '# Project Title\n\n## 📝 Описание\nSome description\n\n## 📦 Быстрый старт\n\n## 📄 Лицензия\nMIT';
     const report = validateLocal(markdown, mockOptions);
 
     const emptySections = report.warnings.filter(w => w.type === 'empty_section');

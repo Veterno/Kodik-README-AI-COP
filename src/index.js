@@ -30,9 +30,12 @@ const pkg = require('../package.json');
 
 async function main(customArgv) {
   // 1. Предварительное определение языка для i18n
-  const tempArgv = customArgv || process.argv.slice(2);
-  const langIdx = tempArgv.indexOf('--lang');
-  const envLang = process.env.KODIK_LANG || process.env.LANG?.split('_')[0];
+  let tempArgv = customArgv || process.argv.slice(2);
+  if (!Array.isArray(tempArgv)) {
+    // Если передан объект (например, из yargs в тестах), пробуем превратить его в массив или просто игнорируем
+    tempArgv = [];
+  }
+  const langIdx = tempArgv.indexOf('--lang');  const envLang = process.env.KODIK_LANG || process.env.LANG?.split('_')[0];
   const initialLang = (langIdx !== -1 ? tempArgv[langIdx + 1] : envLang) || 'ru';
   
   i18n.init(initialLang);
@@ -245,7 +248,7 @@ async function main(customArgv) {
    */
   let projectName = options.projectName;
   
-  const rootPackageJson = manifests.find(m => m.name === 'package.json' && (m.relPath === 'package.json' || !m.relPath.includes('/')));
+  const rootPackageJson = manifests.find(m => m.name === 'package.json' && (m.relPath === 'package.json' || (m.relPath && !m.relPath.includes('/'))));
   
   if (!projectName && rootPackageJson) {
     try {
@@ -357,7 +360,8 @@ async function main(customArgv) {
   } else {
     await pluginManager.runHook('beforeBuild', { markdown });
     await pluginManager.runHook('afterBuild', { markdown });
-    // Локальная валидация и исправление перед сохранением, если передан флаг --fix    if (argv.fix) {
+    // Локальная валидация и исправление перед сохранением, если передан флаг --fix
+    if (argv.fix) {
       log.step('Проверка и автоисправление README...');
       const localReport = validateLocal(markdown, options.content);
       if (localReport.fixes.length > 0) {
@@ -391,7 +395,8 @@ async function main(customArgv) {
     log.warn('Ошибки плагинов:');
     validationCtx.errors.forEach(e => console.log(`  - ${e}`));
   }
-  if (options.validate) {    log.step('Запускаю валидацию сгенерированного README...');
+  if (options.validate) {
+    log.step('Запускаю валидацию сгенерированного README...');
     const contextForValidation = `Project: ${projectName}\nStack: ${stack.language}${stack.framework ? ' + ' + stack.framework : ''}\nStructure:\n${tree}`;
     try {
       const validation = await validateReadme(markdown, contextForValidation, options);
@@ -414,10 +419,9 @@ async function main(customArgv) {
   }
   console.log('\n\x1b[32m\x1b[1m✓ Готово!\x1b[0m\n');
   closeLogger();
+}
 
-
-const handleExit = () => {
-  closeLogger();
+const handleExit = () => {  closeLogger();
   process.exit();
 };
 

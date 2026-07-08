@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { DEFAULT_EMOJIS } = require('./config');
+const { DEFAULT_EMOJIS, DEFAULT_SECTIONS } = require('./config');
 
 /**
  * Собирает финальный Markdown из структурированных данных.
@@ -16,7 +16,7 @@ function buildMarkdown(data, options = {}) {
   const parts = [];
   const style = contentOptions.style || 'modern';
   const emojis = style === 'minimal' ? {} : (contentOptions.emojis || DEFAULT_EMOJIS);
-  const sections = contentOptions.sections || [];
+  const sections = (contentOptions.sections && contentOptions.sections.length > 0) ? contentOptions.sections : DEFAULT_SECTIONS;
 
   sections.forEach(section => {
     if (!section.enabled) return;

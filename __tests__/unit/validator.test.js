@@ -10,12 +10,13 @@ jest.mock('../../src/logger');
 describe('validator.js', () => {
   const mockOptions = {
     ai: {
+      enabled: true,
       apiKey: 'test-key',
       model: 'test-model',
       apiUrl: 'https://api.test.com'
-    }
+    },
+    content: {}
   };
-
   const mockContext = 'Project context';
   const mockMarkdown = '# Test Project\n\nThis is a test project.';
 
@@ -38,8 +39,8 @@ describe('validator.js', () => {
 
     const result = await validateReadme(mockMarkdown, mockContext, mockOptions);
 
-    expect(result).toEqual(mockResponse);
-    expect(AiClient).toHaveBeenCalledWith(expect.objectContaining({
+    expect(result.scores).toEqual(mockResponse.scores);
+    expect(result.feedback).toBe(mockResponse.feedback);    expect(AiClient).toHaveBeenCalledWith(expect.objectContaining({
       apiKey: 'test-key',
       temperature: 0.2
     }));

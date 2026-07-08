@@ -24,7 +24,7 @@ const { resolveSafePath } = require('./utils/pathUtils');
 function scanProject(rootDir, scannerOptions = {}) {
   const { 
     maxFilesPerDir = MAX_FILES_PER_DIR,
-    docsFiles = new Set(DOCS_FILES.map(f => f.toLowerCase()))
+    docsFiles = new Set(Array.from(DOCS_FILES).map(f => f.toLowerCase()))
   } = scannerOptions;
   const absoluteRoot = path.resolve(rootDir);
   const treeLines = [path.basename(absoluteRoot) + '/'];

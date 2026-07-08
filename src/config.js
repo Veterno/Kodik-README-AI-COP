@@ -9,9 +9,8 @@
 const IGNORED_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.cache',
   'coverage', '.nyc_output', '.idea', '.vscode', '__pycache__',
-  '.venv', 'venv', 'env', 'target', 'vendor', 'bin', 'obj',
+  '.venv', 'venv', 'env', 'target', 'vendor', 'bin', 'obj', 'temp_projects',
 ]);
-
 const IGNORED_FILES = new Set([
   '.DS_Store',
   'Thumbs.db',
@@ -95,7 +94,7 @@ const MAX_MANIFEST_DEPTH = 5;
 // то не перечисляем их по отдельности, а показываем обобщённую строку с количеством.
 const MAX_FILES_PER_DIR = 5;
 const CODE_PATHS = ['src', 'lib', 'app', 'models', 'controllers', 'services', 'utils', 'core', 'internal', 'components', 'pages', 'hooks', 'helpers', 'modules'];
-const DOCS_FILES = ['readme.md', 'contributing.md', 'changelog.md', 'code_of_conduct.md', 'security.md', 'features.md', 'product.md', 'roadmap.md', 'user_stories.md'];
+const DOCS_FILES = new Set(['readme.md', 'contributing.md', 'changelog.md', 'code_of_conduct.md', 'security.md', 'features.md', 'product.md', 'roadmap.md', 'user_stories.md']);
 
 const DEFAULT_SECTIONS = [
   { id: 'title', title: null, order: 10, enabled: true },

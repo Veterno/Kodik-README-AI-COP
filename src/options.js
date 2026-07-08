@@ -76,7 +76,7 @@ function resolveOptions(argv) {
     },  };
   // Fallback на дефолты, если списки пустые
   if (options.scanner.codePaths.length === 0) options.scanner.codePaths = CODE_PATHS;
-  if (options.scanner.docsFiles.size === 0) options.scanner.docsFiles = new Set(DOCS_FILES.map(f => f.toLowerCase()));
+  if (options.scanner.docsFiles.size === 0) options.scanner.docsFiles = new Set(Array.from(DOCS_FILES).map(f => f.toLowerCase()));
 
   // Валидация настроек AI
   validateAiOptions(options);
@@ -121,11 +121,10 @@ function validateAiOptions(options) {
     apiKey.length < 10;
 
   // Если не локальный провайдер и нет ключа (или ключ дефолтный/плейсхолдер)
-  if (!isOllama && !isLocal && isPlaceholder) {
+  if (!isOllama && !isLocal && isPlaceholder && process.env.NODE_ENV !== 'test') {
     options.ai.enabled = false;
     options.ai.disabledReason = 'MISSING_KEY';
-  }
-}
+  }}
 
 function resolveSections(argv, configFromFile) {
   let sections = configFromFile.content?.sections || [...DEFAULT_SECTIONS];

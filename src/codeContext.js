@@ -10,6 +10,7 @@ const path = require('path');
 const { log } = require('./logger');
 const { isSensitive, maskSensitive } = require('./utils/sensitive');
 const { resolveSafePath } = require('./utils/pathUtils');
+const { CODE_PATHS: DEFAULT_CODE_PATHS } = require('./config');
 
 // Расширения файлов с кодом
 const CODE_EXTS = ['.js', '.ts', '.jsx', '.tsx', '.py', '.go', '.rs', '.java', '.rb', '.php', '.cs', '.swift', '.kt', '.scala', '.c', '.cpp', '.h', '.hpp'];
@@ -26,7 +27,7 @@ const MAX_LINES_PER_FILE = parseInt(process.env.CODE_CONTEXT_MAX_LINES || '400',
  * @param {string[]} codePaths - список папок для поиска кода
  * @returns {string} - собранный текстовый контекст
  */
-function collectCodeContext(rootDir, flatFiles, mainFile, codePaths = []) {
+function collectCodeContext(rootDir, flatFiles, mainFile, codePaths = DEFAULT_CODE_PATHS) {
   const candidates = [];
 
   // 1) Сам главный файл (если есть)
