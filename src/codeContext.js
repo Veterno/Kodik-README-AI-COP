@@ -11,9 +11,6 @@ const { log } = require('./logger');
 const { isSensitive, maskSensitive } = require('./utils/sensitive');
 const { resolveSafePath } = require('./utils/pathUtils');
 
-// Папки, которые стоит обойти для поиска кода
-const CODE_PATHS = ['src', 'lib', 'app', 'models', 'controllers', 'services', 'utils', 'core', 'internal', 'components', 'pages', 'hooks', 'helpers', 'modules'];
-
 // Расширения файлов с кодом
 const CODE_EXTS = ['.js', '.ts', '.jsx', '.tsx', '.py', '.go', '.rs', '.java', '.rb', '.php', '.cs', '.swift', '.kt', '.scala', '.c', '.cpp', '.h', '.hpp'];
 
@@ -26,9 +23,10 @@ const MAX_LINES_PER_FILE = parseInt(process.env.CODE_CONTEXT_MAX_LINES || '400',
  * @param {string} rootDir - корень проекта
  * @param {Set<string>} flatFiles - список всех файлов (относительные пути)
  * @param {object|null} mainFile - объект с информацией о главном файле
+ * @param {string[]} codePaths - список папок для поиска кода
  * @returns {string} - собранный текстовый контекст
  */
-function collectCodeContext(rootDir, flatFiles, mainFile) {
+function collectCodeContext(rootDir, flatFiles, mainFile, codePaths = []) {
   const candidates = [];
 
   // 1) Сам главный файл (если есть)
@@ -42,7 +40,7 @@ function collectCodeContext(rootDir, flatFiles, mainFile) {
       log.debug(`Пропуск главного файла из-за ошибки безопасности: ${err.message}`);
     }
   }
-  // 2) Другие файлы: проходим по плоскому списку и выбираем те, что лежат в CODE_PATHS
+  // 2) Другие файлы: проходим по плоскому списку и выбираем те, что лежат в codePaths
   const fileList = Array.from(flatFiles);
   for (const rel of fileList) {
     // Проверяем расширение
@@ -52,12 +50,11 @@ function collectCodeContext(rootDir, flatFiles, mainFile) {
     // Проверяем, лежит ли файл в одной из разрешённых папок
     const parts = rel.split(/[/\\]/);
     // Если файл находится на глубине >=1 и первая папка в списке разрешённых
-    if (parts.length >= 2 && CODE_PATHS.includes(parts[0])) {
+    if (parts.length >= 2 && codePaths.includes(parts[0])) {
       if (mainFile && mainFile.name === rel) continue;
       candidates.push({ rel, priority: 1 });
     }
   }
-
   // Сортируем: сначала главный файл, потом остальные (по алфавиту)
   candidates.sort((a, b) => a.priority - b.priority || a.rel.localeCompare(b.rel));
 

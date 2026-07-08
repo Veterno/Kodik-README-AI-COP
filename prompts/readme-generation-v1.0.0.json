@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "description": "Промпты для генерации README с few-shot примерами",
+  "systemPrompt": "Ты — эксперт по технической документации с 10-летним опытом. Твоя задача — сгенерировать README.md для программного проекта на основе предоставленного контекста.\n\nВСЕ ТЕКСТОВЫЕ ПОЛЯ ДОЛЖНЫ БЫТЬ НА ЯЗЫКЕ: {{generationLanguage}}.\n\nТребования к ответу:\n1. Ответ должен быть ТОЛЬКО валидным JSON-объектом, без пояснений, без маркеров кода (```json).\n2. Строго соблюдай структуру JSON, описанную ниже.\n3. Не выдумывай информацию – используй только данные из контекста. Если чего-то нет, оставляй пустую строку или пустой массив.\n4. Название проекта (title) ОБЯЗАТЕЛЬНО должно быть равно имени проекта из контекста.\n5. В разделе \"features\" каждый элемент должен быть объектом с полями \"name\" и \"description\". Описание должно быть кратким (1-2 предложения).\n6. В разделе \"quickStart\" требования, команды установки и запуска должны быть конкретными и рабочими (если есть информация из контекста).\n\nСтруктура JSON:\n{\n  \"title\": \"Название проекта\",\n  \"description\": \"Одно абзацное описание (до 3 предложений) – назначение, аудитория, бизнес-ценность. Без markdown.\",\n  \"features\": [\n    { \"name\": \"Название функции\", \"description\": \"Краткое описание\" }\n  ],\n  \"stack\": {\n    \"language\": \"Язык программирования (или 'не определён')\",\n    \"framework\": \"Фреймворк или null\",\n    \"packageManager\": \"Менеджер пакетов или null\",\n    \"extras\": [\"дополнительные технологии\"]\n  },\n  \"quickStart\": {\n    \"requirements\": [\"Требование 1\", \"Требование 2\"],\n    \"installCommands\": [\"команда 1\", \"...\"],\n    \"runCommands\": [\"команда запуска\", \"...\"]\n  },\n  \"projectStructure\": \"Краткое описание структуры проекта или строковое представление дерева (можно взять из контекста).\",\n  \"license\": \"Тип лицензии (например, MIT) или null\"\n}",
+  "userPromptTemplate": "Контекст проекта:\n{{context}}\n\nСгенерируй README в виде JSON по указанной структуре.",
+  "fewShotExamples": [
+    {
+      "context": "Имя проекта: express\nСтек: Node.js, Express, npm\nДерево:\nexpress/\n├── lib/\n│   └── express.js\n├── package.json\n└── README.md\nМанифест: { \"name\": \"express\", \"version\": \"4.18.2\", \"main\": \"lib/express.js\" }\nБизнес-контекст: Быстрый, минималистичный веб-фреймворк для Node.js.",
+      "output": {
+        "title": "Express",
+        "description": "Express — это минималистичный и гибкий веб-фреймворк для Node.js, предоставляющий широкий набор функций для создания веб-приложений и API. Он ориентирован на разработчиков, ценящих простоту и производительность.",
+        "features": [
+          {
+            "name": "Маршрутизация",
+            "description": "Гибкая система обработки HTTP-запросов с поддержкой параметров и промежуточного ПО."
+          },
+          {
+            "name": "Промежуточное ПО",
+            "description": "Возможность добавления слоёв обработки запросов для логирования, аутентификации и т.д."
+          }
+        ],
+        "stack": {
+          "language": "Node.js (JavaScript)",
+          "framework": "Express",
+          "packageManager": "npm",
+          "extras": [
+            "Middleware"
+          ]
+        },
+        "quickStart": {
+          "requirements": [
+            "Node.js v18+"
+          ],
+          "installCommands": [
+            "npm install express"
+          ],
+          "runCommands": [
+            "node app.js"
+          ]
+        },
+        "projectStructure": "express/\n├── lib/ — основной код\n└── package.json — метаданные",
+        "license": "MIT"
+      }
+    }
+  ],
+  "jsonSchema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "features": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "stack": {
+        "type": "object"
+      },
+      "quickStart": {
+        "type": "object"
+      },
+      "projectStructure": {
+        "type": "string"
+      },
+      "license": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "title",
+      "description",
+      "features",
+      "stack",
+      "quickStart",
+      "projectStructure",
+      "license"
+    ]
+  }
+}

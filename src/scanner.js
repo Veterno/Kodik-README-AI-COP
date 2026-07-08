@@ -11,9 +11,9 @@ const {
   MANIFEST_FILES,
   LICENSE_FILES,
   MAX_MANIFEST_BYTES,
+  MAX_MANIFEST_DEPTH,
   DOCS_FILES,
-} = require('./config');
-const { log } = require('./logger');
+} = require('./config');const { log } = require('./logger');
 const { isSensitive, maskSensitive } = require('./utils/sensitive');
 const { resolveSafePath } = require('./utils/pathUtils');
 
@@ -21,7 +21,11 @@ const { resolveSafePath } = require('./utils/pathUtils');
  * Выполняет единый проход по файловой системе для сбора всей необходимой информации:
  * дерева файлов, плоского списка, манифестов, лицензий и документации.
  */
-function scanProject(rootDir) {
+function scanProject(rootDir, scannerOptions = {}) {
+  const { 
+    maxFilesPerDir = MAX_FILES_PER_DIR,
+    docsFiles = new Set(DOCS_FILES.map(f => f.toLowerCase()))
+  } = scannerOptions;
   const absoluteRoot = path.resolve(rootDir);
   const treeLines = [path.basename(absoluteRoot) + '/'];
   const flatFiles = new Set();
@@ -60,7 +64,7 @@ function scanProject(rootDir) {
       });
 
     const count = filtered.length;
-    const isBigDir = count > MAX_FILES_PER_DIR;
+    const isBigDir = count > maxFilesPerDir;
 
     filtered.forEach((entry, idx) => {
       const name = entry.name;
@@ -98,19 +102,24 @@ function scanProject(rootDir) {
           treeLines.push(prefix + connector + name);
         }
 
-        if (MANIFEST_FILES.includes(name) && depth <= 2) {
-          try {
-            let raw = fs.readFileSync(fullPath, 'utf8');
-            raw = maskSensitive(raw);
-            const content = raw.length > MAX_MANIFEST_BYTES
-              ? raw.slice(0, MAX_MANIFEST_BYTES) + '\n... (файл обрезан)'
-              : raw;
-            manifests.push({ name, content, relPath });
-          } catch (err) {
-            log.warn(`Не удалось прочитать манифест "${name}": ${err.message}`);
+        if (MANIFEST_FILES.includes(name)) {
+          const isRootPackageJson = name === 'package.json' && depth === 1;
+          if (isRootPackageJson || depth <= MAX_MANIFEST_DEPTH) {
+            try {
+              let raw = fs.readFileSync(fullPath, 'utf8');
+              raw = maskSensitive(raw);
+              const content = raw.length > MAX_MANIFEST_BYTES
+                ? raw.slice(0, MAX_MANIFEST_BYTES) + '\n... (файл обрезан)'
+                : raw;
+              manifests.push({ name, content, relPath });
+              log.debug(`Найден манифест: ${relPath}`);
+            } catch (err) {
+              log.warn(`Не удалось прочитать манифест "${name}": ${err.message}`);
+            }
+          } else {
+            log.debug(`Манифест пропущен из-за глубины (${depth} > ${MAX_MANIFEST_DEPTH}): ${relPath}`);
           }
         }
-
         if (!detectedLicense && LICENSE_FILES.includes(name.toUpperCase()) && depth === 1) {
           try {
             const content = fs.readFileSync(fullPath, 'utf8').trim();
@@ -125,7 +134,7 @@ function scanProject(rootDir) {
         }
 
         const lowerName = name.toLowerCase();
-        if (DOCS_FILES.has(lowerName) || (rel.split(path.sep).includes('docs') && lowerName.endsWith('.md'))) {
+        if (docsFiles.has(lowerName) || (rel.split(path.sep).includes('docs') && lowerName.endsWith('.md'))) {
            try {
              let raw = fs.readFileSync(fullPath, 'utf8');
              raw = maskSensitive(raw);

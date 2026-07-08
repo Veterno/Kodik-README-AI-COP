@@ -7,18 +7,24 @@
  */
 
 const { detectStack } = require('./stackDetector');
-const { AiClient } = require('./aiClient');
-const { log } = require('./logger');
+const { mergeStacks } = require('./utils/stackUtils');
+const { AiClient } = require('./aiClient');const { log } = require('./logger');
 const { buildMarkdown } = require('./markdownBuilder');
 const { generateLocal } = require('./localGenerator');
+const { loadPrompts } = require('./promptLoader');
 
 /**
  * Генерирует README.
  */
 async function generateReadme(params) {
-  const { projectName, tree, flatFiles, manifests, manifest, options } = params;
+  const { projectName, tree, flatFiles, manifests, options } = params;
   const useAI = options.ai.enabled;
-  const stack = detectStack(manifests && manifests.length > 0 ? manifests[0] : manifest, flatFiles);
+  
+  const stacks = manifests && manifests.length > 0 
+    ? manifests.map(m => detectStack(m, flatFiles))
+    : [detectStack(null, flatFiles)];
+  
+  const stack = mergeStacks(stacks);
 
   let readmeData;
 
@@ -35,7 +41,7 @@ async function generateReadme(params) {
     readmeData = generateLocal(params);
   }
 
-  const markdown = buildMarkdown(readmeData);
+  const markdown = buildMarkdown(readmeData, options);
   
   // Возвращаем стек для совместимости, если он нужен вызывающей стороне
   return { 
@@ -43,17 +49,16 @@ async function generateReadme(params) {
     stack: readmeData.stack || stack 
   };
 }
-
 /**
  * Внутренняя функция для вызова AI.
  */
 async function generateWithAI(params, stack) {
-  const { projectName, tree, manifest, mainFile, businessContext, interactiveAnswers, codeContext, detectedLicense, options } = params;
+  const { projectName, tree, manifests, mainFile, businessContext, interactiveAnswers, codeContext, detectedLicense, options } = params;
 
   const context = buildContextString({
     projectName,
     tree,
-    manifest,
+    manifests,
     mainFile,
     businessContext,
     interactiveAnswers,
@@ -69,41 +74,26 @@ async function generateWithAI(params, stack) {
     'ru': 'русский', 'en': 'английский', 'es': 'испанский', 
     'fr': 'французский', 'de': 'немецкий', 'zh': 'китайский'
   };
-  const langFull = langMap[genLang] || langFull;
+  const langFull = langMap[genLang] || 'русский';
 
-  const systemPrompt = `Ты — эксперт по технической документации.  
-Твоя задача — сгенерировать README в виде строгого JSON-объекта. 
-ВСЕ ТЕКСТОВЫЕ ПОЛЯ (title, description, features, stack, quickStart) ДОЛЖНЫ БЫТЬ НА ЯЗЫКЕ: ${langFull.toUpperCase()}.
-Используй ТОЛЬКО информацию из предоставленного контекста, не выдумывай факты. В ответе должен быть только JSON, без дополнительных пояснений, без маркеров кода.  
+  // Загрузка промптов
+  const prompts = loadPrompts(options.promptVersion || 'latest');
+  
+  let systemPrompt = prompts.systemPrompt
+    .replace('{{generationLanguage}}', langFull.toUpperCase());
 
-Название проекта (title) ОБЯЗАТЕЛЬНО должно быть: "${projectName}".
+  // Добавляем few-shot примеры, если они есть
+  if (prompts.fewShotExamples && prompts.fewShotExamples.length) {
+    const examplesText = prompts.fewShotExamples.map(ex => 
+      `Пример контекста:\n${ex.context}\n\nПример ответа:\n${JSON.stringify(ex.output, null, 2)}`
+    ).join('\n\n');
+    systemPrompt += '\n\nВот примеры правильных ответов (few-shot):\n' + examplesText;
+  }
 
-Структура JSON должна быть следующей:{
-  "title": "Название проекта",
-  "description": "Краткое описание (назначение, аудитория, бизнес-ценность) — всё в одной строке, без markdown-разметки.",
-  "features": [
-    { "name": "Название функции", "description": "Краткое описание" }
-  ],
-  "stack": {
-    "language": "Язык программирования",
-    "framework": "Фреймворк (если есть)",
-    "packageManager": "Менеджер пакетов",
-    "extras": ["Дополнительные технологии"]
-  },
-  "quickStart": {
-    "requirements": ["Требование 1", "Требование 2"],
-    "installCommands": ["команда установки", "..."],
-    "runCommands": ["команда запуска", "..."]
-  },
-  "projectStructure": "Краткое описание структуры или само дерево (можно взять из контекста)",
-  "license": "Тип лицензии (если есть, иначе MIT)"
-}
+  // Добавляем информацию о тоне и лицензии в системный промпт
+  systemPrompt += `\n\nТон описания: ${tone}.\nЛицензия проекта: ${licenseName}.`;
 
-Убедись, что все поля присутствуют. Если информация отсутствует, оставь пустую строку или пустой массив, но не пропускай поля.  
-Тон описания: ${tone}.  
-Лицензия проекта: ${licenseName}.`;
-
-  const userPrompt = `Контекст проекта:\n${context}\n\nСгенерируй README в виде JSON по указанной структуре.`;
+  const userPrompt = prompts.userPromptTemplate.replace('{{context}}', context);
 
   const client = new AiClient(options.ai);
   const jsonResult = await client.generateReadme({ systemPrompt, userPrompt }, { json: true });
@@ -114,14 +104,18 @@ async function generateWithAI(params, stack) {
 
   return jsonResult;
 }
-
 /**
  * Строит текстовый контекст для AI-генерации.
  */
-function buildContextString({ projectName, tree, manifest, mainFile, businessContext, interactiveAnswers, stack, codeContext }) {
+function buildContextString({ projectName, tree, manifests, mainFile, businessContext, interactiveAnswers, stack, codeContext }) {
   const parts = [];
   parts.push(`Имя проекта: ${projectName}`);
-  if (manifest) parts.push(`Манифест: ${manifest.name}\nСодержимое:\n${manifest.content}`);
+  if (manifests && manifests.length > 0) {
+    parts.push('Манифесты:');
+    manifests.forEach(m => {
+      parts.push(`--- ${m.relPath || m.name} ---\n${m.content}`);
+    });
+  }
   if (mainFile) parts.push(`Главный файл: ${mainFile.name}\nПервые строки:\n${mainFile.content}`);
   if (tree) parts.push(`Структура проекта:\n${tree}`);
   if (stack) {

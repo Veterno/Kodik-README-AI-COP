@@ -60,6 +60,7 @@ async function finalScan(markdown, options) {
           }
         } catch (err) {
           log.warn(`Не удалось перевести раздел "${sectionName}": ${err.message}`);
+          log.warn(`⚠️ Перевод раздела "${sectionName}" не удался. Оставляем оригинальный текст.`);
         }
       }
     }

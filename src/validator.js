@@ -2,12 +2,43 @@
 
 const { AiClient } = require('./aiClient');
 const { log } = require('./logger');
+const { validateLocal } = require('./localValidator');
 
 /**
- * Валидация сгенерированного README с помощью LLM-as-a-Judge.
+ * Валидация сгенерированного README.
+ * Сначала выполняется локальная проверка, затем (опционально) AI-валидация.
  */
 async function validateReadme(markdown, context, options) {
-  const client = new AiClient({ ...options.ai, temperature: 0.2 }); // Низкая температура для стабильности оценок
+  log.info('Выполняю локальную валидацию...');
+  const localResult = validateLocal(markdown, options.content);
+  
+  // Вывод локальных результатов
+  if (localResult.errors.length > 0) {
+    log.error('Найдены критические ошибки в структуре README:');
+    localResult.errors.forEach(err => log.error(`  - ${err.message}`));
+  }
+
+  if (localResult.warnings.length > 0) {
+    log.warn('Найдены замечания к README:');
+    localResult.warnings.forEach(warn => log.warn(`  - ${warn.message}`));
+  }
+
+  if (localResult.errors.length === 0 && localResult.warnings.length === 0) {
+    log.ok('Локальная валидация пройдена успешно.');
+  }
+
+  // Если AI отключен или есть критические ошибки, которые не позволяют AI корректно оценить,
+  // мы можем вернуть только локальный результат.
+  if (!options.ai.enabled) {
+    return {
+      local: localResult,
+      scores: null,
+      feedback: 'AI-валидация пропущена (AI отключен).'
+    };
+  }
+
+  log.info('Запускаю AI-валидацию (LLM-as-a-Judge)...');
+  const client = new AiClient({ ...options.ai, temperature: 0.2 });
 
   const systemPrompt = `Ты — эксперт по качеству технической документации. 
 Твоя задача — оценить сгенерированный README.md на основе предоставленного контекста проекта.
@@ -39,13 +70,17 @@ ${markdown}
 Проведи аудит и выстави оценки.`;
 
   try {
-    const result = await client.generateReadme({ systemPrompt, userPrompt });
-    return result;
-  } catch (err) {
-    log.error(`Ошибка при валидации: ${err.message}`);
+    const aiResult = await client.generateReadme({ systemPrompt, userPrompt });
     return {
+      local: localResult,
+      ...aiResult
+    };
+  } catch (err) {
+    log.error(`Ошибка при AI-валидации: ${err.message}`);
+    return {
+      local: localResult,
       scores: { accuracy: 0, clarity: 0, completeness: 0, hallucinations: 0 },
-      feedback: "Ошибка валидации: " + err.message
+      feedback: "Ошибка AI-валидации: " + err.message
     };
   }
 }

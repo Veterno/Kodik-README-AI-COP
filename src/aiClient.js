@@ -10,6 +10,7 @@ const axios = require('axios');
 const { log } = require('./logger');
 const { AI_CONFIG } = require('./config');
 const { parseJsonFromResponse } = require('./utils/jsonParser');
+const { formatAxiosError } = require('./utils/errorFormatter');
 
 class AiClient {
   constructor(config = {}) {
@@ -76,6 +77,12 @@ class AiClient {
     const useResponseFormat = json && AI_CONFIG.USE_RESPONSE_FORMAT && this.provider !== 'ollama';
 
     try {
+      // Проверка API-ключа
+      const isLocal = this.provider === 'ollama' || this.provider === 'local';
+      if (!isLocal && (!this.apiKey || this.apiKey === 'ollama')) {
+        throw new Error('❌ OPENAI_API_KEY не задан. Укажите его в .env или через аргумент --api-key.');
+      }
+
       log.debug(`AI Request [${this.provider}]: model=${this.model}, json=${json}, retry=${retryCount}`);
       
       const response = await axios.post(
@@ -98,25 +105,24 @@ class AiClient {
 
       return this._extractContent(response).trim();
     } catch (err) {
-      const errorData = err.response?.data;
-      const errorMessage = errorData ? (typeof errorData === 'object' ? JSON.stringify(errorData) : errorData) : err.message;
-
+      const formattedError = formatAxiosError(err);
+      
       // Обработка ошибки неподдерживаемого параметра response_format
       if (err.response && err.response.status === 400 && useResponseFormat) {
         log.warn(`Провайдер ${this.provider} не поддерживает response_format. Пробую без него...`);
         return this.chat(messages, { ...options, json: false, retryCount: retryCount + 1 });
       }
 
-      if (retryCount < this.maxRetries) {
+      if (retryCount < this.maxRetries && !formattedError.includes('API-ключ') && !formattedError.includes('не задан')) {
         const nextRetry = retryCount + 1;
         const waitTime = Math.pow(2, nextRetry) * 1000;
-        log.warn(`Ошибка AI (${errorMessage}). Попытка ${nextRetry}/${this.maxRetries} через ${waitTime}ms...`);
+        log.warn(`Ошибка AI (${formattedError}). Попытка ${nextRetry}/${this.maxRetries} через ${waitTime}ms...`);
         await new Promise(r => setTimeout(r, waitTime));
         return this.chat(messages, { ...options, retryCount: nextRetry });
       }
 
-      log.error(`Критическая ошибка AI после ${retryCount} попыток: ${errorMessage}`);
-      throw new Error(errorMessage);
+      log.error(`Критическая ошибка AI после ${retryCount} попыток: ${formattedError}`, err);
+      throw new Error(formattedError);
     }
   }
   /**

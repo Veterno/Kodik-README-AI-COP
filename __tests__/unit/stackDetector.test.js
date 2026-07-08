@@ -191,4 +191,54 @@ describe('stackDetector: detectStack', () => {
     expect(stack.language).toBe('PHP');
     expect(stack.runCommands).toContain('php -S localhost:8000');
   });
+
+  test('должен определять Elixir и Phoenix из mix.exs', () => {
+    const manifest = {
+      name: 'mix.exs',
+      content: 'defp deps do [{:phoenix, "~> 1.7.0"}] end'
+    };
+    const stack = detectStack(manifest, new Set(['mix.exs']));
+
+    expect(stack.language).toBe('Elixir');
+    expect(stack.framework).toBe('Phoenix');
+    expect(stack.packageManager).toBe('mix');
+    expect(stack.runCommands).toContain('mix phx.server');
+  });
+
+  test('должен определять Swift и Vapor из Package.swift', () => {
+    const manifest = {
+      name: 'Package.swift',
+      content: 'dependencies: [.package(url: "https://github.com/vapor/vapor.git", from: "4.0.0")]'
+    };
+    const stack = detectStack(manifest, new Set(['Package.swift']));
+
+    expect(stack.language).toBe('Swift');
+    expect(stack.framework).toBe('Vapor');
+    expect(stack.runCommands).toContain('swift run');
+  });
+
+  test('должен определять Kotlin Multiplatform', () => {
+    const manifest = {
+      name: 'build.gradle.kts',
+      content: 'kotlin { multiplatform { android(); ios(); } }'
+    };
+    const stack = detectStack(manifest, new Set(['build.gradle.kts']));
+
+    expect(stack.language).toBe('Kotlin Multiplatform');
+    expect(stack.extras).toContain('Android');
+    expect(stack.extras).toContain('iOS');
+  });
+
+  test('должен определять Django из settings.py', () => {
+    const manifest = {
+      name: 'settings.py',
+      content: 'ROOT_URLCONF = "myproject.urls"\nINSTALLED_APPS = ["django.contrib.admin", "myapp"]\nDATABASES = {"default": {"ENGINE": "django.db.backends.postgresql"}}'
+    };
+    const stack = detectStack(manifest, new Set(['settings.py']));
+
+    expect(stack.language).toBe('Python');
+    expect(stack.framework).toBe('Django');
+    expect(stack.extras).toContain('Project: myproject');
+    expect(stack.extras).toContain('DB: PostgreSQL');
+  });
 });

@@ -6,7 +6,11 @@ const path = require('path');
 const process = require('process');
 const yargs = require('yargs');
 const { hideBin } = require('yargs/helpers');
-require('dotenv').config();
+
+// Загружаем .env из текущей рабочей директории
+const dotenv = require('dotenv');
+const envPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: envPath, override: true });
 
 const { log, initLogger, closeLogger } = require('./logger');
 const { findMainFile } = require('./mainFile');
@@ -18,17 +22,64 @@ const { collectCodeContext } = require('./codeContext');
 const { scanProject } = require('./scanner');
 const { finalScan } = require('./finalScanner');
 const { validateReadme } = require('./validator');
+const { applyFixes, validateLocal } = require('./localValidator');
 const { resolveOptions } = require('./options');
+const { PluginManager } = require('./pluginManager');
+const { i18n, t } = require('./i18n');
 const pkg = require('../package.json');
 
 async function main(customArgv) {
+  // 1. Предварительное определение языка для i18n
+  const tempArgv = customArgv || process.argv.slice(2);
+  const langIdx = tempArgv.indexOf('--lang');
+  const envLang = process.env.KODIK_LANG || process.env.LANG?.split('_')[0];
+  const initialLang = (langIdx !== -1 ? tempArgv[langIdx + 1] : envLang) || 'ru';
+  
+  i18n.init(initialLang);
+
   initLogger();
 
   const argv = customArgv || yargs(hideBin(process.argv))
-    .usage('Использование: $0 [target] [options]')
+    .usage(t('cli.usage'))
     .positional('target', {
-      describe: 'Путь к проекту (целевая директория)',
+      describe: t('cli.opt_target'),
       type: 'string'
+    })
+    .option('lang', {
+      describe: t('cli.opt_lang'),
+      type: 'string',
+      default: 'ru'
+    })
+    .option('n', {
+      alias: 'non-interactive',
+      describe: t('cli.opt_non_interactive'),
+      type: 'boolean'
+    })
+    .option('ai', {
+      describe: t('cli.opt_ai'),
+      type: 'boolean'
+    })
+    .option('m', {
+      alias: 'model',
+      describe: t('cli.opt_model'),
+      type: 'string'
+    })
+    .option('api-url', {
+      describe: t('cli.opt_api_url'),
+      type: 'string'
+    })
+    .option('api-key', {
+      describe: t('cli.opt_api_key'),
+      type: 'string'
+    })
+    .option('o', {
+      alias: 'output',
+      describe: t('cli.opt_output'),
+      type: 'string'
+    })
+    .option('dry-run', {
+      describe: t('cli.opt_dry_run'),
+      type: 'boolean'
     })
     .option('t', {
       alias: 'target',
@@ -85,21 +136,60 @@ async function main(customArgv) {
       describe: 'Запустить валидацию после генерации',
       type: 'boolean'
     })
-    .option('projectName', {
+    .option('fix', {
+      describe: 'Автоматически исправлять ошибки в README (требует --validate)',
+      type: 'boolean'
+    })    .option('projectName', {
       describe: 'Явное название проекта (переопределяет package.json)',
       type: 'string'
     })
-    .option('dry-run', {
-      describe: 'Показать результат без сохранения',
+    .option('prompt-version', {
+      describe: 'Версия промптов (latest или номер)',
+      type: 'string',
+      default: 'latest'
+    })
+    .option('dry-run', {      describe: 'Показать результат без сохранения',
       type: 'boolean'
     })
     .option('translate-section', {
       describe: 'Секции для перевода (можно несколько)',
       type: 'array'
     })
-    .example('$0 .', 'Сгенерировать README для текущей папки')
-    .example('$0 ./my-project --non-interactive', 'Тихая генерация с дефолтами')
+    .option('code-paths', {
+      describe: 'Список папок для поиска кода (через запятую)',
+      type: 'string'
+    })
+    .option('docs-files', {
+      describe: 'Список имен файлов документации (через запятую)',
+      type: 'string'
+    })
+    .option('max-files-per-dir', {
+      describe: 'Макс. количество файлов в папке перед сворачиванием в дереве',
+      type: 'number'
+    })
+    .example('$0 .', 'Сгенерировать README для текущей папки')    .example('$0 ./my-project --non-interactive', 'Тихая генерация с дефолтами')
     .example('$0 --tone marketing --language en', 'Маркетинговый тон на английском')
+    .option('template', {
+      describe: 'Путь к файлу шаблона (.md)',
+      type: 'string'
+    })
+    .option('style', {
+      describe: 'Стиль оформления',
+      choices: ['modern', 'minimal'],
+      type: 'string'
+    })
+    .option('section-order', {
+      describe: 'Порядок разделов через запятую',
+      type: 'string'
+    })
+    .option('disable-section', {
+      describe: 'Отключить раздел (можно несколько)',
+      type: 'array'
+    })
+    .option('enable-section', {
+      describe: 'Включить раздел (можно несколько)',
+      type: 'array'
+    })
     .help('h')
     .alias('h', 'help')
     .version('v', 'Показать версию', pkg.version)
@@ -110,8 +200,29 @@ async function main(customArgv) {
   console.log('\n\x1b[1m\x1b[35m📝 Kodik README AI\x1b[0m — автоматический генератор README.md\n');
 
   const options = resolveOptions(argv);
-  const targetDir = options.target;
 
+  const pluginManager = new PluginManager();
+  await pluginManager.load(options);
+
+  // Уведомление о локальном режиме
+  if (argv.ai !== false) {
+    if (!options.ai.enabled) {
+      if (options.ai.disabledReason === 'MISSING_KEY') {
+        log.warn('⚠️  API-ключ не найден или содержит плейсхолдер. Работаем в локальном режиме (без AI).');
+        console.log('   Чтобы использовать AI, укажите валидный OPENAI_API_KEY в .env или через --api-key.\n');
+      } else {
+        log.info('ℹ️  AI-генерация отключена. Работаем в локальном режиме.');
+      }
+    } else {
+      const isLocalAI = options.ai.apiUrl?.includes('localhost') || options.ai.apiUrl?.includes('127.0.0.1') || options.ai.apiKey === 'ollama';
+      if (isLocalAI) {
+        log.info('🤖 Используется локальный AI-провайдер (Ollama/LM Studio).');
+      } else {
+        log.info('🌐 Используется облачный AI-провайдер (OpenAI/DeepSeek/Groq).');
+      }
+    }
+  }
+  const targetDir = options.target;
   if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
     log.error(`Указанная папка не существует или не является директорией: ${targetDir}`);
     process.exit(1);
@@ -122,23 +233,25 @@ async function main(customArgv) {
 
   // 1. Единое сканирование
   log.step('Шаг 1/6. Сканирую проект…');
-  const scanResult = scanProject(targetDir);
+  await pluginManager.runHook('beforeScan');
+  const scanResult = scanProject(targetDir, options.scanner);
   const { tree, flatFiles, manifests, detectedLicense: scannedLicense, docs } = scanResult;
+  await pluginManager.runHook('afterScan', { projectData: scanResult });
   log.ok('Сканирование завершено.');
-
   // 2. Манифест и Лицензия
   log.step('Шаг 2/6. Обрабатываю манифест и лицензию…');
-  const manifest = manifests.length > 0 ? manifests[0] : null;
   
   /**
    * Определение названия проекта (Приоритет: CLI > package.json > имя папки)
    */
   let projectName = options.projectName;
   
-  if (!projectName && manifest && manifest.name === 'package.json') {
+  const rootPackageJson = manifests.find(m => m.name === 'package.json' && (m.relPath === 'package.json' || !m.relPath.includes('/')));
+  
+  if (!projectName && rootPackageJson) {
     try {
       // Очищаем содержимое от возможной пометки об обрезке
-      const cleanContent = manifest.content.replace(/\n\.\.\. \(файл обрезан\)$/, '');
+      const cleanContent = rootPackageJson.content.replace(/\n\.\.\. \(файл обрезан\)$/, '');
       const pkgData = JSON.parse(cleanContent);
       if (pkgData.name) {
         projectName = pkgData.name;
@@ -152,8 +265,11 @@ async function main(customArgv) {
     projectName = path.basename(targetDir);
   }
 
-  if (manifest) log.ok(`Найден манифест: ${manifest.name}`);
-  else log.warn('Манифест не найден — продолжаю без него.');
+  if (manifests.length > 0) {
+    log.ok(`Найдено манифестов: ${manifests.length} (${manifests.map(m => m.name).join(', ')})`);
+  } else {
+    log.warn('Манифесты не найдены — продолжаю без них.');
+  }
 
   log.info(`Название проекта: ${projectName}`);
 
@@ -162,7 +278,7 @@ async function main(customArgv) {
 
   // 3. Главный файл
   log.step('Шаг 3/6. Ищу главный файл исходного кода…');
-  const mainFile = findMainFile(targetDir, manifest, flatFiles);
+  const mainFile = findMainFile(targetDir, manifests[0] || null, flatFiles);
   if (mainFile) log.ok(`Найден главный файл: ${mainFile.name}`);
   else log.warn('Главный файл не найден — продолжаю без него.');
 
@@ -187,9 +303,8 @@ async function main(customArgv) {
   let codeContext = '';
   try {
     businessContext = collectBusinessContext(targetDir, docs);
-    codeContext = collectCodeContext(targetDir, flatFiles, mainFile);
-    log.ok('Бизнес-контекст и контекст кода собраны.');
-  } catch (err) {
+    codeContext = collectCodeContext(targetDir, flatFiles, mainFile, options.scanner.codePaths);
+    log.ok('Бизнес-контекст и контекст кода собраны.');  } catch (err) {
     log.warn(`Ошибка при сборе контекста: ${err.message}. Продолжаю с ограниченным контекстом.`);
   }
 
@@ -198,12 +313,15 @@ async function main(customArgv) {
   let markdown;
   let stack;
   try {
+    await pluginManager.runHook('beforeGenerate', {
+      projectName,
+      context: { businessContext, codeContext }
+    });
     const result = await generateReadme({
       projectName,
       tree,
       flatFiles,
       manifests,
-      manifest,
       mainFile,
       interactiveAnswers,
       businessContext,
@@ -213,13 +331,13 @@ async function main(customArgv) {
     });
     markdown = result.markdown;
     stack = result.stack;
+    await pluginManager.runHook('afterGenerate', { rawContent: markdown, stack });
     log.ok(`Стек: ${stack.language || 'не определён'}${stack.framework ? ' + ' + stack.framework : ''}.`);
     log.ok('README сгенерирован.');
   } catch (err) {
     log.error(`Ошибка при генерации README: ${err.message}`);
     process.exit(1);
   }
-
   // 7. Финальный сканер (перевод)
   if (!options.content.noTranslate) {
     log.step(`Финальная обработка (перевод на ${options.content.targetLanguage})…`);
@@ -231,11 +349,34 @@ async function main(customArgv) {
   }
   // 8. Сохранение
   if (options.dryRun) {
+    await pluginManager.runHook('beforeBuild', { markdown });
+    await pluginManager.runHook('afterBuild', { markdown });
+    
     console.log('\n--- DRY RUN: Содержимое README.md ---\n');
     console.log(markdown);
     console.log('\n--- КОНЕЦ ---');
   } else {
-    log.step('Сохраняю README.md…');
+    await pluginManager.runHook('beforeBuild', { markdown });
+    await pluginManager.runHook('afterBuild', { markdown });
+    // Локальная валидация и исправление перед сохранением, если передан флаг --fix    if (argv.fix) {
+      log.step('Проверка и автоисправление README...');
+      const localReport = validateLocal(markdown, options.content);
+      if (localReport.fixes.length > 0) {
+        // Создаем резервную копию, если файл уже существует
+        const outPath = path.join(options.output, 'README.md');
+        if (fs.existsSync(outPath)) {
+          const backupPath = `${outPath}.bak`;
+          fs.copyFileSync(outPath, backupPath);
+          log.info(`Создана резервная копия: ${backupPath}`);
+        }
+        markdown = applyFixes(markdown, localReport.fixes);
+        log.ok(`Применено исправлений: ${localReport.fixes.length}`);
+      } else {
+        log.info('Исправления не требуются.');
+      }
+    }
+
+    log.step('Сохраняю README.md...');
     try {
       const outPath = saveReadme(options.output, markdown);
       log.ok(`README.md успешно создан: ${outPath}`);
@@ -246,26 +387,36 @@ async function main(customArgv) {
   }
 
   // 9. Валидация
-  if (options.validate) {
-    log.step('Запускаю валидацию сгенерированного README…');
+  const validationCtx = await pluginManager.runHook('validate', { markdown });
+  if (validationCtx.errors && validationCtx.errors.length > 0) {
+    log.warn('Ошибки плагинов:');
+    validationCtx.errors.forEach(e => console.log(`  - ${e}`));
+  }
+
+  if (options.validate) {    log.step('Запускаю валидацию сгенерированного README...');
     const contextForValidation = `Project: ${projectName}\nStack: ${stack.language}${stack.framework ? ' + ' + stack.framework : ''}\nStructure:\n${tree}`;
     try {
       const validation = await validateReadme(markdown, contextForValidation, options);
       console.log('\n--- Результаты валидации ---');
-      console.log(`Точность: ${validation.scores.accuracy}/10`);
-      console.log(`Ясность: ${validation.scores.clarity}/10`);
-      console.log(`Полнота: ${validation.scores.completeness}/10`);
-      console.log(`Отсутствие галлюцинаций: ${validation.scores.hallucinations}/10`);
-      console.log(`Отзыв: ${validation.feedback}`);
+      if (validation.scores) {
+        console.log(`Точность: ${validation.scores.accuracy}/10`);
+        console.log(`Ясность: ${validation.scores.clarity}/10`);
+        console.log(`Полнота: ${validation.scores.completeness}/10`);
+        console.log(`Отсутствие галлюцинаций: ${validation.scores.hallucinations}/10`);
+      }
+      if (validation.local) {
+        console.log(`Локальные ошибки: ${validation.local.errors.length}`);
+        console.log(`Локальные предупреждения: ${validation.local.warnings.length}`);
+      }
+      console.log(`Отзыв: ${validation.feedback || 'Нет отзывов'}`);
       console.log('----------------------------\n');
     } catch (err) {
       log.warn(`Валидация не удалась: ${err.message}`);
     }
   }
-
   console.log('\n\x1b[32m\x1b[1m✓ Готово!\x1b[0m\n');
   closeLogger();
-}
+
 
 const handleExit = () => {
   closeLogger();
@@ -289,7 +440,31 @@ process.on('uncaughtException', (err) => {
 
 if (require.main === module) {
   main().catch(err => {
-    log.error('Критическая ошибка в главном цикле', err);
+    const msg = err.message || '';
+    
+    if (msg.includes('OPENAI_API_KEY')) {
+      log.error('Ошибка конфигурации: API-ключ не найден.');
+      console.log('\x1b[33mПодсказка: Создайте файл .env и добавьте OPENAI_API_KEY=ваш_ключ или используйте флаг --api-key.\x1b[0m');
+    } else if (msg.includes('Ошибка сети') || msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND')) {
+      log.error('Ошибка сети: Не удалось подключиться к AI-сервису.');
+      console.log('\x1b[33mПодсказка: Проверьте интернет-соединение и доступность OPENAI_BASE_URL.\x1b[0m');
+    } else if (msg.includes('Модель не найдена') || msg.includes('404')) {
+      log.error('Ошибка AI: Указанная модель не найдена.');
+      console.log('\x1b[33mПодсказка: Проверьте название модели в параметре --model или OPENAI_MODEL.\x1b[0m');
+    } else if (msg.includes('Ошибка авторизации') || msg.includes('401')) {
+      log.error('Ошибка авторизации: Неверный API-ключ.');
+      console.log('\x1b[33mПодсказка: Убедитесь, что OPENAI_API_KEY корректен.\x1b[0m');
+    } else {
+      log.error(`Критическая ошибка: ${msg}`);
+      if (process.env.DEBUG !== 'true') {
+        console.log('\x1b[90mДля получения подробной информации запустите с DEBUG=true\x1b[0m');
+      }
+    }
+
+    if (process.env.DEBUG === 'true') {
+      console.error(err);
+    }
+
     closeLogger();
     process.exit(1);
   });

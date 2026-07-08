@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "usage": "Usage: $0 [target] [options]",
+    "welcome": "📝 Kodik README AI — automatic README.md generator",
+    "opt_target": "Path to project (target directory)",
+    "opt_lang": "Interface language (ru, en)",
+    "opt_non_interactive": "Skip interactive prompt",
+    "opt_ai": "Enable AI generation",
+    "opt_model": "AI model",
+    "opt_api_url": "API URL",
+    "opt_api_key": "API key",
+    "opt_output": "Directory to save README.md",
+    "opt_dry_run": "Show result without saving",
+    "step_scan": "Step 1/6. Scanning project…",
+    "step_manifest": "Step 2/6. Processing manifest and license…",
+    "step_main_file": "Step 3/6. Looking for main source file…",
+    "step_interactive": "Step 4/6. Running interactive prompt (if not disabled)…",
+    "step_context": "Step 5/6. Collecting business context (Git logs, docs)…",
+    "step_generate": "Step 6/6. Generating README…",
+    "scan_ok": "Scanning completed.",
+    "scan_error_dir": "Specified folder does not exist or is not a directory: {{path}}",
+    "target_dir": "Target directory: {{path}}",
+    "dry_run_warn": "DRY RUN mode: file will not be saved.",
+    "done": "Done!"
+  },
+  "ai": {
+    "local_mode": "Using local AI provider (Ollama/LM Studio).",
+    "cloud_mode": "Using cloud AI provider (OpenAI/DeepSeek/Groq).",
+    "missing_key": "⚠️ API key not found or contains placeholder. Running in local mode (no AI).",
+    "disabled": "ℹ️ AI generation disabled. Running in local mode."
+  },
+  "errors": {
+    "critical": "Critical error: {{msg}}",
+    "config_missing_key": "Configuration error: API key not found."
+  }
+}

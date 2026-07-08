@@ -63,8 +63,9 @@ const MANIFEST_FILES = [
   'Gemfile',
   'pubspec.yaml',
   'mix.exs',
+  'Package.swift',
+  'settings.py',
 ];
-
 const LICENSE_FILES = [
   'LICENSE',
   'LICENSE.md',
@@ -88,10 +89,33 @@ const MAX_MAIN_FILE_LINES = 200;
 const MAX_TREE_DEPTH = 4;           
 const MAX_TREE_ENTRIES = 400;        
 const MAX_MANIFEST_BYTES = 8000;
+const MAX_MANIFEST_DEPTH = 5;
 
 // Новая константа: если в папке больше этого числа элементов (файлов + подпапок),
 // то не перечисляем их по отдельности, а показываем обобщённую строку с количеством.
 const MAX_FILES_PER_DIR = 5;
+const CODE_PATHS = ['src', 'lib', 'app', 'models', 'controllers', 'services', 'utils', 'core', 'internal', 'components', 'pages', 'hooks', 'helpers', 'modules'];
+const DOCS_FILES = ['readme.md', 'contributing.md', 'changelog.md', 'code_of_conduct.md', 'security.md', 'features.md', 'product.md', 'roadmap.md', 'user_stories.md'];
+
+const DEFAULT_SECTIONS = [
+  { id: 'title', title: null, order: 10, enabled: true },
+  { id: 'description', title: 'Описание', order: 20, enabled: true },
+  { id: 'features', title: 'Ключевые возможности', order: 30, enabled: true },
+  { id: 'stack', title: 'Стек технологий', order: 40, enabled: true },
+  { id: 'quickStart', title: 'Быстрый старт', order: 50, enabled: true },
+  { id: 'projectStructure', title: 'Структура проекта', order: 60, enabled: true },
+  { id: 'license', title: 'Лицензия', order: 70, enabled: true },
+];
+
+const DEFAULT_EMOJIS = {
+  title: '🚀',
+  description: '📝',
+  features: '✨',
+  stack: '🛠️',
+  quickStart: '📦',
+  projectStructure: '📂',
+  license: '📄'
+};
 
 module.exports = {
   IGNORED_DIRS,
@@ -102,11 +126,13 @@ module.exports = {
   MAX_TREE_DEPTH,
   MAX_TREE_ENTRIES,
   MAX_MANIFEST_BYTES,
+  MAX_MANIFEST_DEPTH,
   MAX_FILES_PER_DIR,
-  DOCS_FILES: new Set(['readme.md', 'contributing.md', 'changelog.md', 'code_of_conduct.md', 'security.md', 'features.md', 'product.md', 'roadmap.md', 'user_stories.md']),
-  SENSITIVE_PATTERNS,
-  AI_CONFIG: {
-    RETRY_ATTEMPTS: parseInt(process.env.AI_RETRY_ATTEMPTS || '3', 10),
+  CODE_PATHS,
+  DOCS_FILES,
+  DEFAULT_SECTIONS,
+  DEFAULT_EMOJIS,
+  SENSITIVE_PATTERNS,  AI_CONFIG: {    RETRY_ATTEMPTS: parseInt(process.env.AI_RETRY_ATTEMPTS || '3', 10),
     TIMEOUT: parseInt(process.env.AI_TIMEOUT || '60000', 10),
     USE_RESPONSE_FORMAT: process.env.AI_USE_RESPONSE_FORMAT !== 'false',
     DEFAULT_TEMPERATURE: 0.7,

@@ -36,7 +36,7 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           USE_AI: true
         run: |
-          node scripts/benchmark.js \
+          npm run benchmark -- \
             --models "${{ github.event.inputs.models || 'gpt-4o-mini' }}" \
             --concurrency ${{ github.event.inputs.concurrency || 3 }}
 
@@ -44,12 +44,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: .benchmark-results/
+          path: benchmark-results/
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .benchmark-results
+          publish_dir: benchmark-results
           publish_branch: gh-pages

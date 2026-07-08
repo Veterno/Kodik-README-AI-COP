@@ -1,26 +1,34 @@
 'use strict';
 
 const { detectStack } = require('./stackDetector');
+const { mergeStacks } = require('./utils/stackUtils');
 const { log } = require('./logger');
 
 /**
  * Локальная генерация данных для README (без AI).
  */
-function generateLocal({ projectName, tree, flatFiles, manifests, manifest, mainFile, interactiveAnswers, businessContext, detectedLicense, options }) {
-  const stack = detectStack(manifests && manifests.length > 0 ? manifests[0] : manifest, flatFiles);
+function generateLocal({ projectName, tree, flatFiles, manifests, mainFile, interactiveAnswers, businessContext, detectedLicense, codeContext, options }) {
+  const stacks = manifests && manifests.length > 0 
+    ? manifests.map(m => detectStack(m, flatFiles))
+    : [detectStack(null, flatFiles)];
+  
+  const stack = mergeStacks(stacks);
   const tone = interactiveAnswers?.tone || options?.content?.tone || 'technical';
+
+  const codeFunctions = extractFunctionsFromCode(codeContext);
 
   const description = buildDescription({
     projectName,
     stack,
     interactiveAnswers,
     businessContext,
-    tone
+    tone,
+    codeFunctions
   });
 
-  const features = buildFeaturesList({ interactiveAnswers, tree, flatFiles });
+  const features = buildFeaturesList({ interactiveAnswers, tree, flatFiles, codeFunctions });
 
-  const quickStartData = buildQuickStartData({ stack, manifest });
+  const quickStartData = buildQuickStartData({ stack });
 
   return {
     title: projectName,
@@ -38,7 +46,46 @@ function generateLocal({ projectName, tree, flatFiles, manifests, manifest, main
   };
 }
 
-function buildDescription({ projectName, stack, interactiveAnswers, businessContext, tone }) {
+/**
+ * Извлекает имена функций и классов из codeContext.
+ */
+function extractFunctionsFromCode(codeContext) {
+  if (!codeContext) return [];
+  
+  // codeContext обычно разделен блоками "--- Файл: ... ---"
+  const blocks = codeContext.split(/\n--- Файл: /);
+  const functions = new Set();
+
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+    const lines = block.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Регулярка для поиска функций, классов, интерфейсов (JS/TS/Python/Go)
+      // Ищем: function Name, class Name, const Name = (..., def Name(
+      const match = trimmed.match(/^(?:export\s+)?(?:function|class|interface|type|const|def)\s+([a-zA-Z0-9_]+)/);
+      if (match && match[1]) {
+        // Игнорируем слишком общие или служебные слова
+        const name = match[1];
+        if (name.length > 2 && !['const', 'let', 'var', 'return', 'if', 'else'].includes(name)) {
+          functions.add(name);
+        }
+      }
+
+      // Поиск стрелочных функций: const name = (...) =>
+      const arrowMatch = trimmed.match(/const\s+([a-zA-Z0-9_]+)\s*=\s*\(/);
+      if (arrowMatch && arrowMatch[1]) {
+        functions.add(arrowMatch[1]);
+      }
+    }
+  }
+  
+  return Array.from(functions);
+}
+
+function buildDescription({ projectName, stack, interactiveAnswers, businessContext, tone, codeFunctions }) {
   const typeMap = {
     web: 'веб-приложение',
     library: 'библиотеку',
@@ -119,13 +166,18 @@ function buildDescription({ projectName, stack, interactiveAnswers, businessCont
       else if (projectType === 'library') description += `Он предоставляет API для интеграции в ваши проекты.`;
       else if (projectType === 'cli') description += `Управление осуществляется через командную строку.`;
       else if (projectType === 'web') description += `Доступ к функциональности осуществляется через веб-интерфейс.`;
+
+      if (codeFunctions && codeFunctions.length > 0) {
+        const keyExports = codeFunctions.slice(0, 3).join(', ');
+        description += ` Ключевые компоненты: ${keyExports}.`;
+      }
       break;
   }
 
   return description;
 }
 
-function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
+function buildFeaturesList({ interactiveAnswers, tree, flatFiles, codeFunctions }) {
   const userFeatures = [];
   if (interactiveAnswers?.keyFeatures) {
     const items = interactiveAnswers.keyFeatures.split(',').map(s => s.trim()).filter(Boolean);
@@ -139,6 +191,13 @@ function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
   if (tree.includes('test/') || tree.includes('tests/') || tree.includes('_test.')) autoFeatures.push('🧪 Модульные тесты');
   if (flatFiles.has('Dockerfile') || flatFiles.has('docker-compose.yml')) autoFeatures.push('🐳 Контейнеризация (Docker)');
   if (flatFiles.has('.github/workflows') || flatFiles.has('.gitlab-ci.yml')) autoFeatures.push('⚙️ CI/CD');
+
+  if (codeFunctions && codeFunctions.length > 0) {
+    const top5 = codeFunctions.slice(0, 5);
+    top5.forEach(fn => {
+      autoFeatures.push(`🔧 Функция/Компонент: ${fn}`);
+    });
+  }
 
   const all = [...userFeatures];
   for (const af of autoFeatures) {
@@ -159,7 +218,7 @@ function buildFeaturesList({ interactiveAnswers, tree, flatFiles }) {
   return all;
 }
 
-function buildQuickStartData({ stack, manifest }) {
+function buildQuickStartData({ stack }) {
   const data = {
     requirements: stack.requirements || [],
     installCommands: stack.installCommands || [],
@@ -169,23 +228,6 @@ function buildQuickStartData({ stack, manifest }) {
 
   if (data.requirements.length === 0) {
     data.requirements.push('Убедитесь, что необходимые инструменты установлены (см. документацию).');
-  }
-
-  // Добавление зависимостей из package.json, если они есть
-  if (manifest && manifest.name === 'package.json') {
-    try {
-      const pkg = JSON.parse(manifest.content.replace(/\n\.\.\. \(файл обрезан\)$/, ''));
-      const deps = Object.keys(pkg.dependencies || {});
-      const devDeps = Object.keys(pkg.devDependencies || {});
-      
-      // Мы не возвращаем это как часть quickStart напрямую в markdownBuilder,
-      // но в старом коде это выводилось отдельно. 
-      // Для совместимости с новым markdownBuilder, который ожидает плоский объект,
-      // мы можем добавить это в описание или оставить как есть. 
-      // В данном рефакторинге мы следуем структуре AI ответа.
-    } catch (err) {
-      log.debug(`Ошибка парсинга package.json в локальном генераторе: ${err.message}`);
-    }
   }
 
   return data;

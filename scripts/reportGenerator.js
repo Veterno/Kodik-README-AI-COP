@@ -3,23 +3,30 @@
 const fs = require('fs');
 const path = require('path');
 
-function generate(jsonPath) {
+/**
+ * Генерирует HTML-отчёт на основе JSON-данных бенчмарка.
+ * @param {string} jsonPath Путь к JSON-файлу с результатами.
+ */
+async function generateReport(jsonPath) {
   const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  const results = data.results.filter(r => r.success);
-  
+  const resultsDir = path.dirname(jsonPath);
+  const { results, config, timestamp } = data;
+
   // Агрегация данных для графиков
-  const models = [...new Set(results.map(r => r.model))];
-  const metrics = ['accuracy', 'clarity', 'completeness', 'hallucinations'];
-  
-  const modelStats = models.map(model => {
-    const modelResults = results.filter(r => r.model === model);
-    const stats = {};
-    metrics.forEach(metric => {
-      const avg = modelResults.reduce((sum, r) => sum + r.scores[metric], 0) / modelResults.length;
-      stats[metric] = avg.toFixed(2);
-    });
-    return { model, stats };
+  const modelStats = {};
+  results.forEach(res => {
+    if (!res.success) return;
+    if (!modelStats[res.model]) {
+      modelStats[res.model] = { totalScore: 0, count: 0, totalTime: 0 };
+    }
+    modelStats[res.model].totalScore += res.scores?.overall || 0;
+    modelStats[res.model].totalTime += res.generationTimeMs || 0;
+    modelStats[res.model].count++;
   });
+
+  const chartLabels = Object.keys(modelStats);
+  const chartScores = chartLabels.map(m => (modelStats[m].totalScore / modelStats[m].count).toFixed(2));
+  const chartTimes = chartLabels.map(m => (modelStats[m].totalTime / modelStats[m].count / 1000).toFixed(2));
 
   const html = `
 <!DOCTYPE html>
@@ -27,30 +34,35 @@ function generate(jsonPath) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kodik README AI Benchmark Report</title>
+    <title>Kodik README AI Benchmark</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f4f7f9; }
-        .card { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
         h1, h2 { color: #2c3e50; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; }
-        .score { font-weight: bold; }
-        .score-high { color: #27ae60; }
-        .score-mid { color: #f39c12; }
-        .score-low { color: #e74c3c; }
-        .chart-container { position: relative; height: 400px; width: 100%; }
+        .status-success { color: #27ae60; font-weight: bold; }
+        .status-error { color: #e74c3c; font-weight: bold; }
+        .score-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #3498db; color: white; font-weight: bold; }
+        .charts-container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .chart-box { flex: 1; min-width: 400px; }
+        .meta { font-size: 0.9em; color: #7f8c8d; }
     </style>
 </head>
 <body>
-    <h1>Отчёт о бенчмаркинге Kodik README AI</h1>
-    <p>Дата запуска: ${new Date(data.timestamp).toLocaleString()}</p>
+    <h1>🚀 Kodik README AI Benchmark</h1>
+    <p class="meta">Запуск от: ${new Date(timestamp).toLocaleString()} | Версия: ${config.version}</p>
 
-    <div class="card">
-        <h2>Сравнение моделей</h2>
-        <div class="chart-container">
-            <canvas id="modelChart"></canvas>
+    <div class="charts-container">
+        <div class="card chart-box">
+            <h2>Средний балл по моделям</h2>
+            <canvas id="scoresChart"></canvas>
+        </div>
+        <div class="card chart-box">
+            <h2>Среднее время генерации (сек)</h2>
+            <canvas id="timesChart"></canvas>
         </div>
     </div>
 
@@ -61,68 +73,71 @@ function generate(jsonPath) {
                 <tr>
                     <th>Репозиторий</th>
                     <th>Модель</th>
-                    <th>Accuracy</th>
-                    <th>Clarity</th>
-                    <th>Completeness</th>
-                    <th>Hallucinations</th>
+                    <th>Статус</th>
+                    <th>Балл (Overall)</th>
                     <th>Время (сек)</th>
+                    <th>Коммит</th>
                 </tr>
             </thead>
             <tbody>
-                ${results.map(r => `
+                ${results.map(res => `
                 <tr>
-                    <td>${r.repoName}</td>
-                    <td>${r.model}</td>
-                    <td class="score ${getScoreClass(r.scores.accuracy)}">${r.scores.accuracy}</td>
-                    <td class="score ${getScoreClass(r.scores.clarity)}">${r.scores.clarity}</td>
-                    <td class="score ${getScoreClass(r.scores.completeness)}">${r.scores.completeness}</td>
-                    <td class="score ${getScoreClass(r.scores.hallucinations, true)}">${r.scores.hallucinations}</td>
-                    <td>${(r.generationTimeMs / 1000).toFixed(1)}</td>
+                    <td><a href="${res.repoUrl}" target="_blank">${res.repoName}</a></td>
+                    <td><code>${res.model}</code></td>
+                    <td>
+                        <span class="${res.success ? 'status-success' : 'status-error'}">
+                            ${res.success ? '✅ OK' : '❌ Fail'}
+                        </span>
+                    </td>
+                    <td>${res.success ? `<span class="score-badge">${res.scores?.overall || 0}</span>` : '-'}</td>
+                    <td>${(res.generationTimeMs / 1000).toFixed(2)}s</td>
+                    <td><code>${res.commitHash}</code></td>
                 </tr>
+                ${res.error ? `<tr><td colspan="6" class="status-error" style="font-size: 0.8em;">Ошибка: ${res.error}</td></tr>` : ''}
                 `).join('')}
             </tbody>
         </table>
     </div>
 
     <script>
-        const ctx = document.getElementById('modelChart').getContext('2d');
-        new Chart(ctx, {
+        const ctxScores = document.getElementById('scoresChart').getContext('2d');
+        new Chart(ctxScores, {
             type: 'bar',
             data: {
-                labels: ${JSON.stringify(metrics)},
-                datasets: ${JSON.stringify(modelStats.map(ms => ({
-                  label: ms.model,
-                  data: metrics.map(m => ms.stats[m]),
-                  borderWidth: 1
-                })))}
+                labels: ${JSON.stringify(chartLabels)},
+                datasets: [{
+                    label: 'Средний балл (0-10)',
+                    data: ${JSON.stringify(chartScores)},
+                    backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    borderWidth: 1
+                }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, max: 10 }
-                }
-            }
+            options: { scales: { y: { beginAtZero: true, max: 10 } } }
+        });
+
+        const ctxTimes = document.getElementById('timesChart').getContext('2d');
+        new Chart(ctxTimes, {
+            type: 'bar',
+            data: {
+                labels: ${JSON.stringify(chartLabels)},
+                datasets: [{
+                    label: 'Время (сек)',
+                    data: ${JSON.stringify(chartTimes)},
+                    backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                    borderColor: 'rgba(46, 204, 113, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
         });
     </script>
 </body>
 </html>
   `;
 
-  const reportPath = path.join(path.dirname(jsonPath), 'index.html');
-  fs.writeFileSync(reportPath, html);
-  console.log(`HTML-отчёт создан: ${reportPath}`);
+  fs.writeFileSync(path.join(resultsDir, 'index.html'), html);
+  console.log(`📊 Отчёт сгенерирован: ${path.join(resultsDir, 'index.html')}`);
 }
 
-function getScoreClass(score, inverted = false) {
-  if (inverted) {
-    if (score <= 2) return 'score-high';
-    if (score <= 5) return 'score-mid';
-    return 'score-low';
-  }
-  if (score >= 8) return 'score-high';
-  if (score >= 5) return 'score-mid';
-  return 'score-low';
-}
-
-module.exports = { generate };
+module.exports = { generateReport };

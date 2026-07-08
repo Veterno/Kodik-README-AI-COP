@@ -207,15 +207,80 @@ function detectFromPomXml(content) {
 }
 
 function detectFromGradle(content) {
-  const framework = includesAny(content, ['spring-boot']) ? 'Spring Boot' : null;
+  const isKmp = content.includes('kotlin("multiplatform")') || content.includes('multiplatform {');
+  const framework = includesAny(content, ['spring-boot']) ? 'Spring Boot' : (isKmp ? 'Kotlin Multiplatform' : null);
+  
+  const extras = [];
+  if (content.includes('android')) extras.push('Android');
+  if (content.includes('ios')) extras.push('iOS');
+  if (content.includes('jvm')) extras.push('JVM');
+  if (content.includes('js')) extras.push('JS');
+
   return {
-    language: 'Java/Kotlin',
+    language: isKmp ? 'Kotlin Multiplatform' : 'Java/Kotlin',
     framework,
     packageManager: 'gradle',
     requirements: ['JDK 17+', 'Gradle (или используйте gradlew)'],
     installCommands: ['./gradlew build'],
     runCommands: framework === 'Spring Boot' ? ['./gradlew bootRun'] : ['./gradlew run'],
+    extras,
+  };
+}
+
+function detectFromMixExs(content) {
+  const framework = content.includes(':phoenix') ? 'Phoenix' : null;
+  return {
+    language: 'Elixir',
+    framework,
+    packageManager: 'mix',
+    requirements: ['Elixir 1.14+', 'Erlang/OTP 25+'],
+    installCommands: ['mix deps.get'],
+    runCommands: framework === 'Phoenix' ? ['mix phx.server'] : ['iex -S mix'],
     extras: [],
+  };
+}
+
+function detectFromPackageSwift(content) {
+  const framework = content.includes('vapor') ? 'Vapor' : null;
+  return {
+    language: 'Swift',
+    framework,
+    packageManager: 'swift',
+    requirements: ['Swift 5.9+'],
+    installCommands: ['swift build'],
+    runCommands: ['swift run'],
+    extras: [],
+  };
+}
+
+function detectFromSettingsPy(content) {
+  const projectNameMatch = content.match(/ROOT_URLCONF\s*=\s*['"](.+)\.urls['"]/);
+  const projectName = projectNameMatch ? projectNameMatch[1] : 'Django Project';
+
+  const installedApps = [];
+  const appsMatch = content.match(/INSTALLED_APPS\s*=\s*\[([\s\S]+?)\]/);
+  if (appsMatch) {
+    const appsStr = appsMatch[1];
+    const appLines = appsStr.split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean);
+    installedApps.push(...appLines);
+  }
+
+  const databases = [];
+  if (content.includes('django.db.backends.postgresql')) databases.push('PostgreSQL');
+  if (content.includes('django.db.backends.mysql')) databases.push('MySQL');
+  if (content.includes('django.db.backends.sqlite3')) databases.push('SQLite');
+
+  return {
+    language: 'Python',
+    framework: 'Django',
+    packageManager: 'pip',
+    requirements: ['Python 3.10+', 'pip', 'Django'],
+    installCommands: ['pip install -r requirements.txt'],
+    runCommands: ['python manage.py runserver'],
+    extras: [
+      `Project: ${projectName}`,
+      databases.length ? `DB: ${databases.join(', ')}` : null,
+    ].filter(Boolean),
   };
 }
 
@@ -318,6 +383,9 @@ function detectStack(manifest, flatFiles) {
       case 'build.gradle.kts':  stack = detectFromGradle(manifest.content); break;
       case 'Gemfile':           stack = detectFromGemfile(); break;
       case 'pubspec.yaml':      stack = detectFromPubspec(); break;
+      case 'mix.exs':          stack = detectFromMixExs(manifest.content); break;
+      case 'Package.swift':     stack = detectFromPackageSwift(manifest.content); break;
+      case 'settings.py':       stack = detectFromSettingsPy(manifest.content); break;
       default: stack = null;
     }
   }
