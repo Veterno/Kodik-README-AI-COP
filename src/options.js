@@ -69,10 +69,11 @@ function resolveOptions(argv) {
     },
 
     // Настройки плагинов
-    plugins: argv.plugins || configFromFile.plugins || [],
-    localPluginsPath: argv.localPluginsPath || configFromFile.localPluginsPath || './plugins',
-    disabledPlugins: argv.disabledPlugins || configFromFile.disabledPlugins || []
-  };
+    noPlugins: argv.noPlugins || configFromFile.noPlugins || false,
+    plugins: {
+      paths: argv.pluginPaths ? (Array.isArray(argv.pluginPaths) ? argv.pluginPaths : [argv.pluginPaths]) : (configFromFile.plugins?.paths || []),
+      npmPackages: argv.npmPlugins ? (Array.isArray(argv.npmPlugins) ? argv.npmPlugins : [argv.npmPlugins]) : (configFromFile.plugins?.npmPackages || [])
+    },  };
   // Fallback на дефолты, если списки пустые
   if (options.scanner.codePaths.length === 0) options.scanner.codePaths = CODE_PATHS;
   if (options.scanner.docsFiles.size === 0) options.scanner.docsFiles = new Set(DOCS_FILES.map(f => f.toLowerCase()));

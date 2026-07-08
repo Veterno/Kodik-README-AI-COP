@@ -201,9 +201,8 @@ async function main(customArgv) {
 
   const options = resolveOptions(argv);
 
-  const pluginManager = new PluginManager();
-  await pluginManager.load(options);
-
+  const pluginManager = new PluginManager(options);
+  await pluginManager.load();
   // Уведомление о локальном режиме
   if (argv.ai !== false) {
     if (!options.ai.enabled) {
@@ -387,12 +386,11 @@ async function main(customArgv) {
   }
 
   // 9. Валидация
-  const validationCtx = await pluginManager.runHook('validate', { markdown });
+  const validationCtx = await pluginManager.runHook('validate');
   if (validationCtx.errors && validationCtx.errors.length > 0) {
     log.warn('Ошибки плагинов:');
     validationCtx.errors.forEach(e => console.log(`  - ${e}`));
   }
-
   if (options.validate) {    log.step('Запускаю валидацию сгенерированного README...');
     const contextForValidation = `Project: ${projectName}\nStack: ${stack.language}${stack.framework ? ' + ' + stack.framework : ''}\nStructure:\n${tree}`;
     try {
