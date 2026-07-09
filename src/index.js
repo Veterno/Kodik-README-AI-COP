@@ -12,21 +12,20 @@ const dotenv = require('dotenv');
 const envPath = path.resolve(process.cwd(), '.env');
 dotenv.config({ path: envPath, override: true });
 
-const { log, initLogger, closeLogger } = require('./logger');
-const { findMainFile } = require('./mainFile');
-const { generateReadme } = require('./generateReadme');
-const { saveReadme } = require('./saveReadme');
-const { runInteractive } = require('./interactive');
-const { collectBusinessContext } = require('./contextCollector');
-const { collectCodeContext } = require('./codeContext');
-const { scanProject } = require('./scanner');
-const { finalScan } = require('./finalScanner');
-const { validateReadme } = require('./validator');
-const { applyFixes, validateLocal } = require('./localValidator');
-const { resolveOptions } = require('./options');
+const { log, initLogger, closeLogger } = require('./core/logger');
+const { findMainFile } = require('./scanner/entryDetector');
+const { generateReadme } = require('./generator/readmeGenerator');
+const { saveReadme } = require('./output/persistence');
+const { runInteractive } = require('./interfaces/cli/interactive');
+const { collectBusinessContext } = require('./context/contextCollector');
+const { collectCodeContext } = require('./context/codeContext');
+const { scanProject } = require('./scanner/projectScanner');
+const { finalScan } = require('./output/processors/finalScanner');
+const { validateReadme } = require('./validation/aiRules');
+const { applyFixes, validateLocal } = require('./validation/localRules');
+const { resolveOptions } = require('./interfaces/cli/options');
 const { PluginManager } = require('./pluginManager');
-const { i18n, t } = require('./i18n');
-const pkg = require('../package.json');
+const { i18n, t } = require('./core/i18n');const pkg = require('../package.json');
 
 async function main(customArgv) {
   // 1. Предварительное определение языка для i18n
@@ -193,8 +192,13 @@ async function main(customArgv) {
       describe: 'Включить раздел (можно несколько)',
       type: 'array'
     })
-    .help('h')
-    .alias('h', 'help')
+    .option('no-plugins', {
+      describe: 'Отключить загрузку всех плагинов',
+      type: 'boolean'
+    })
+    .command(require('./commands/plugin'))
+    .command(require('./commands/template'))
+    .help('h')    .alias('h', 'help')
     .version('v', 'Показать версию', pkg.version)
     .alias('v', 'version')
     .wrap(null)
@@ -237,10 +241,9 @@ async function main(customArgv) {
   log.step('Шаг 1/6. Сканирую проект…');
   await pluginManager.runHook('beforeScan');
   const scanResult = scanProject(targetDir, options.scanner);
-  const { tree, flatFiles, manifests, detectedLicense: scannedLicense, docs } = scanResult;
+  const { tree, flatFiles, manifests, detectedLicense: scannedLicense, docs, codeContext } = scanResult;
   await pluginManager.runHook('afterScan', { projectData: scanResult });
-  log.ok('Сканирование завершено.');
-  // 2. Манифест и Лицензия
+  log.ok('Сканирование завершено.');  // 2. Манифест и Лицензия
   log.step('Шаг 2/6. Обрабатываю манифест и лицензию…');
   
   /**
@@ -302,15 +305,22 @@ async function main(customArgv) {
   // 5. Сбор бизнес-контекста
   log.step('Шаг 5/6. Собираю бизнес-контекст (Git-логи, документы)…');
   let businessContext = { commits: [], features: [], fixes: [], docs: {} };
-  let codeContext = '';
   try {
-    businessContext = collectBusinessContext(targetDir, docs);
-    codeContext = collectCodeContext(targetDir, flatFiles, mainFile, options.scanner.codePaths);
+    const { getGitLogSummary } = require('./context/contextCollector');
+    const gitLog = getGitLogSummary(targetDir);
+    
+    // Формируем финальный бизнес-контекст, используя уже собранные доки из сканера
+    const docsContent = {};
+    docs.forEach(doc => {
+      if (doc.name.toLowerCase() !== 'readme.md') {
+        docsContent[doc.name] = doc.content;
+      }
+    });
+
+    businessContext = { ...gitLog, docs: docsContent };
     log.ok('Бизнес-контекст и контекст кода собраны.');  } catch (err) {
     log.warn(`Ошибка при сборе контекста: ${err.message}. Продолжаю с ограниченным контекстом.`);
-  }
-
-  // 6. Генерация README
+  }  // 6. Генерация README
   log.step('Шаг 6/6. Генерирую README…');
   let markdown;
   let stack;
@@ -428,18 +438,22 @@ const handleExit = () => {  closeLogger();
 process.on('SIGINT', handleExit);
 process.on('SIGTERM', handleExit);
 
-process.on('unhandledRejection', (reason) => {
-  log.error('Необработанное отклонение Promise', reason);
-  closeLogger();
-  process.exit(1);
+process.on('unhandledRejection', (reason, promise) => {
+  log.error('Критическая ошибка: Необработанное отклонение Promise', reason instanceof Error ? reason : new Error(String(reason)));
+  // Даем время логгеру записать сообщение перед выходом
+  setTimeout(() => {
+    closeLogger();
+    process.exit(1);
+  }, 100);
 });
 
 process.on('uncaughtException', (err) => {
-  log.error('Непредвиденная ошибка', err);
-  closeLogger();
-  process.exit(1);
+  log.error('Критическая ошибка: Непредвиденное исключение', err);
+  setTimeout(() => {
+    closeLogger();
+    process.exit(1);
+  }, 100);
 });
-
 if (require.main === module) {
   main().catch(err => {
     const msg = err.message || '';

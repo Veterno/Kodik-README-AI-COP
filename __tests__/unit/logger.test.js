@@ -21,16 +21,14 @@ describe('Logger Module', () => {
   });
 
   test('log.info should call console.log', () => {
-    const { log } = require('../../src/logger');
-    log.info('test info');
+    const { log } = require('../../src/core/logger');    log.info('test info');
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('test info'));
   });
 
   test('initLogger should create directory if it does not exist', () => {
     jest.isolateModules(() => {
       process.env.LOG_FILE = 'logs/test.log';
-      const { initLogger } = require('../../src/logger');
-      fs.existsSync.mockReturnValue(false);
+      const { initLogger } = require('../../src/core/logger');      fs.existsSync.mockReturnValue(false);
       fs.createWriteStream.mockReturnValue({ on: jest.fn(), write: jest.fn(), end: jest.fn() });
 
       initLogger();
@@ -42,8 +40,7 @@ describe('Logger Module', () => {
   test('writeToFile should write to stream if initialized', () => {
     jest.isolateModules(() => {
       process.env.LOG_FILE = 'logs/test.log';
-      const { log, initLogger, closeLogger } = require('../../src/logger');
-      const mockStream = { on: jest.fn(), write: jest.fn(), end: jest.fn() };
+      const { log, initLogger, closeLogger } = require('../../src/core/logger');      const mockStream = { on: jest.fn(), write: jest.fn(), end: jest.fn() };
       fs.createWriteStream.mockReturnValue(mockStream);
       fs.existsSync.mockReturnValue(true);
 
@@ -60,15 +57,13 @@ describe('Logger Module', () => {
   test('log.debug should call console.log if DEBUG is true', () => {
     jest.isolateModules(() => {
       process.env.DEBUG = 'true';
-      const { log } = require('../../src/logger');
-      log.debug('debug message');
+      const { log } = require('../../src/core/logger');      log.debug('debug message');
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('[DEBUG] debug message'), '');
     });
   });
 
   test('log.error should handle error object', () => {
-    const { log } = require('../../src/logger');
-    const error = new Error('test error');
+    const { log } = require('../../src/core/logger');    const error = new Error('test error');
     log.error('failed', error);
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('failed'));
   });

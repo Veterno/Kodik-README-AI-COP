@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { scanProject } = require('../../src/scanner');
+const { scanProject } = require('../../src/scanner/projectScanner');
 
 describe('scanner: scanProject', () => {
   let tempDir;

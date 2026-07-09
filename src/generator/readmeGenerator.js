@@ -6,13 +6,11 @@
  * Выбирает стратегию (AI или локальная) и использует markdownBuilder для сборки.
  */
 
-const { detectStack } = require('./stackDetector');
-const { mergeStacks } = require('./utils/stackUtils');
-const { AiClient } = require('./aiClient');const { log } = require('./logger');
-const { buildMarkdown } = require('./markdownBuilder');
+const { detectStack, mergeStacks } = require('../context/stack/detector');const { AiClient } = require('./ai/client');
+const { log } = require('../core/logger');
+const { buildMarkdown } = require('./builder/markdownBuilder');
 const { generateLocal } = require('./localGenerator');
 const { loadPrompts } = require('./promptLoader');
-
 /**
  * Генерирует README.
  */

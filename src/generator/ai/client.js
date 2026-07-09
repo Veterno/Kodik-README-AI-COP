@@ -7,11 +7,11 @@
  */
 
 const axios = require('axios');
-const { log } = require('./logger');
-const { AI_CONFIG } = require('./config');
-const { parseJsonFromResponse } = require('./utils/jsonParser');
-const { formatAxiosError } = require('./utils/errorFormatter');
-
+const axiosRetry = require('axios-retry').default || require('axios-retry');
+const { log } = require('../../core/logger');
+const { AI_CONFIG } = require('../../core/config');
+const { parseJsonFromResponse } = require('../../utils/jsonParser');
+const { formatAxiosError } = require('../../utils/errorFormatter');
 class AiClient {
   constructor(config = {}) {
     this.baseURL = (config.apiUrl || config.baseURL || process.env.OPENAI_BASE_URL || 'http://localhost:11434/v1').replace(/\/+$/, '');
@@ -21,8 +21,31 @@ class AiClient {
     this.temperature = config.temperature ?? parseFloat(process.env.OPENAI_TEMPERATURE || AI_CONFIG.DEFAULT_TEMPERATURE);
     this.timeout = config.timeout || AI_CONFIG.TIMEOUT;
     this.maxRetries = config.retryAttempts ?? config.maxRetries ?? AI_CONFIG.RETRY_ATTEMPTS;
-  }
 
+    // Настройка axios с ретраями
+    this.client = axios.create({
+      baseURL: this.baseURL,
+      timeout: this.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      }
+    });
+
+    axiosRetry(this.client, {
+      retries: this.maxRetries,
+      retryDelay: (retryCount) => {
+        const delay = Math.pow(2, retryCount) * 1000;
+        log.warn(`Повторная попытка запроса к AI (${retryCount}/${this.maxRetries}) через ${delay}ms...`);
+        return delay;
+      },
+      retryCondition: (error) => {
+        // Повторяем только при сетевых ошибках или 5xx
+        return axiosRetry.isNetworkOrIdempotentRequestError(error) || 
+               (error.response && error.response.status >= 500);
+      }
+    });
+  }
   /**
    * Определяет провайдера по URL для применения специфичных адаптаций.
    */
@@ -70,8 +93,7 @@ class AiClient {
   async chat(messages, options = {}) {
     const { 
       json = false, 
-      temperature = this.temperature, 
-      retryCount = 0 
+      temperature = this.temperature
     } = options;
 
     const useResponseFormat = json && AI_CONFIG.USE_RESPONSE_FORMAT && this.provider !== 'ollama';
@@ -83,23 +105,16 @@ class AiClient {
         throw new Error('❌ OPENAI_API_KEY не задан. Укажите его в .env или через аргумент --api-key.');
       }
 
-      log.debug(`AI Request [${this.provider}]: model=${this.model}, json=${json}, retry=${retryCount}`);
+      log.debug(`AI Request [${this.provider}]: model=${this.model}, json=${json}`);
       
-      const response = await axios.post(
-        `${this.baseURL}/chat/completions`,
+      const response = await this.client.post(
+        '/chat/completions',
         {
           model: this.model,
           messages,
           temperature,
           response_format: useResponseFormat ? { type: 'json_object' } : undefined,
           stream: false,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-          timeout: this.timeout,
         }
       );
 
@@ -110,22 +125,13 @@ class AiClient {
       // Обработка ошибки неподдерживаемого параметра response_format
       if (err.response && err.response.status === 400 && useResponseFormat) {
         log.warn(`Провайдер ${this.provider} не поддерживает response_format. Пробую без него...`);
-        return this.chat(messages, { ...options, json: false, retryCount: retryCount + 1 });
+        return this.chat(messages, { ...options, json: false });
       }
 
-      if (retryCount < this.maxRetries && !formattedError.includes('API-ключ') && !formattedError.includes('не задан')) {
-        const nextRetry = retryCount + 1;
-        const waitTime = Math.pow(2, nextRetry) * 1000;
-        log.warn(`Ошибка AI (${formattedError}). Попытка ${nextRetry}/${this.maxRetries} через ${waitTime}ms...`);
-        await new Promise(r => setTimeout(r, waitTime));
-        return this.chat(messages, { ...options, retryCount: nextRetry });
-      }
-
-      log.error(`Критическая ошибка AI после ${retryCount} попыток: ${formattedError}`, err);
+      log.error(`Критическая ошибка AI: ${formattedError}`, err);
       throw new Error(formattedError);
     }
-  }
-  /**
+  }  /**
    * Генерация README с гарантированным получением JSON.
    */
   async generateReadme(context, options = {}) {

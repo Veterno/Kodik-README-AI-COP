@@ -8,10 +8,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { log } = require('./logger');
-const { maskSensitive } = require('./utils/sensitive');
-const { resolveSafePath } = require('./utils/pathUtils');
-
+const { log } = require('../core/logger');
+const { maskSensitive } = require('../utils/sensitive');
+const { resolveSafePath } = require('../utils/pathUtils');
 function saveReadme(rootDir, markdown) {
   const target = resolveSafePath(rootDir, 'README.md');
 

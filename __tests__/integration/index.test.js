@@ -24,29 +24,29 @@ jest.mock('yargs/helpers', () => ({
   hideBin: (args) => args
 }));
 
-const { log, initLogger, closeLogger } = require('../../src/logger');
-const scanner = require('../../src/scanner');
-const interactive = require('../../src/interactive');
-const contextCollector = require('../../src/contextCollector');
-const codeContext = require('../../src/codeContext');
-const generateReadme = require('../../src/generateReadme');
-const saveReadme = require('../../src/saveReadme');
-const finalScanner = require('../../src/finalScanner');
-const validator = require('../../src/validator');
-const options = require('../../src/options');
+const { log, initLogger, closeLogger } = require('../../src/core/logger');
+const scanner = require('../../src/scanner/projectScanner');
+const interactive = require('../../src/interfaces/cli/interactive');
+const contextCollector = require('../../src/context/contextCollector');
+const codeContext = require('../../src/context/contextCollector');
+const generateReadme = require('../../src/generator/readmeGenerator');
+const saveReadme = require('../../src/output/persistence');
+const finalScanner = require('../../src/output/processors/finalScanner');
+const validator = require('../../src/validation/aiRules');
+const options = require('../../src/interfaces/cli/options');
 
 // Мокаем остальные зависимости
 jest.mock('fs');
-jest.mock('../../src/logger');
-jest.mock('../../src/scanner');
-jest.mock('../../src/interactive');
-jest.mock('../../src/contextCollector');
-jest.mock('../../src/codeContext');
-jest.mock('../../src/generateReadme');
-jest.mock('../../src/saveReadme');
-jest.mock('../../src/finalScanner');
-jest.mock('../../src/validator');
-jest.mock('../../src/options');
+jest.mock('../../src/core/logger');
+jest.mock('../../src/scanner/projectScanner');
+jest.mock('../../src/interfaces/cli/interactive');
+jest.mock('../../src/context/contextCollector');
+jest.mock('../../src/context/contextCollector');
+jest.mock('../../src/generator/readmeGenerator');
+jest.mock('../../src/output/persistence');
+jest.mock('../../src/output/processors/finalScanner');
+jest.mock('../../src/validation/aiRules');
+jest.mock('../../src/interfaces/cli/options');
 
 // Чтобы не выходить из процесса во время тестов
 const mockExit = jest.spyOn(process, 'exit').mockImplementation((code) => {
@@ -54,7 +54,7 @@ const mockExit = jest.spyOn(process, 'exit').mockImplementation((code) => {
 });
 
 // Импортируем main после моков
-const { main } = require('../../src/index');
+const { main } = require('../../src/interfaces/cli/main');
 
 describe('index.js (Integration)', () => {
   const mockArgs = {

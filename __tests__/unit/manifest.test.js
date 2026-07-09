@@ -3,11 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const { findManifest } = require('../../src/manifest');
-const { MANIFEST_FILES, MAX_MANIFEST_BYTES } = require('../../src/config');
-const { log } = require('../../src/logger');
+const { MANIFEST_FILES, MAX_MANIFEST_BYTES } = require('../../src/core/config');
+const { log } = require('../../src/core/logger');
 
 jest.mock('fs');
-jest.mock('../../src/logger');
+jest.mock('../../src/core/logger');
 
 describe('manifest.js', () => {
   const rootDir = '/test-project';

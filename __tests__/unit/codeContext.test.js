@@ -2,14 +2,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const { collectCodeContext } = require('../../src/codeContext');
+const { scanProject } = require('../../src/scanner/projectScanner');
 const { resolveSafePath } = require('../../src/utils/pathUtils');
 const { maskSensitive } = require('../../src/utils/sensitive');
 
 jest.mock('fs');
 jest.mock('../../src/utils/pathUtils');
 jest.mock('../../src/utils/sensitive');
-jest.mock('../../src/logger');
+jest.mock('../../src/core/logger');
 
 describe('codeContext.js', () => {
   const rootDir = '/root';

@@ -1,8 +1,7 @@
 'use strict';
 
-const { detectStack } = require('./stackDetector');
-const { mergeStacks } = require('./utils/stackUtils');
-const { log } = require('./logger');
+const { detectStack, mergeStacks } = require('../context/stack/detector');
+const { log } = require('../core/logger');
 
 /**
  * Локальная генерация данных для README (без AI).

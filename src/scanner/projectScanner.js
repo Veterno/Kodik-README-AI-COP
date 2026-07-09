@@ -13,9 +13,9 @@ const {
   MAX_MANIFEST_BYTES,
   MAX_MANIFEST_DEPTH,
   DOCS_FILES,
-} = require('./config');const { log } = require('./logger');
-const { isSensitive, maskSensitive } = require('./utils/sensitive');
-const { resolveSafePath } = require('./utils/pathUtils');
+  CODE_PATHS,
+} = require('../core/config');const { log } = require('../core/logger');const { isSensitive, maskSensitive } = require('../utils/sensitive');
+const { resolveSafePath } = require('../utils/pathUtils');
 
 /**
  * Выполняет единый проход по файловой системе для сбора всей необходимой информации:
@@ -24,17 +24,26 @@ const { resolveSafePath } = require('./utils/pathUtils');
 function scanProject(rootDir, scannerOptions = {}) {
   const { 
     maxFilesPerDir = MAX_FILES_PER_DIR,
-    docsFiles = new Set(Array.from(DOCS_FILES).map(f => f.toLowerCase()))
+    docsFiles = new Set(Array.from(DOCS_FILES).map(f => f.toLowerCase())),
+    codePaths = Array.from(CODE_PATHS || []),
+    collectCode = true
   } = scannerOptions;
+
+  // Расширения файлов с кодом
+  const CODE_EXTS = new Set(['.js', '.ts', '.jsx', '.tsx', '.py', '.go', '.rs', '.java', '.rb', '.php', '.cs', '.swift', '.kt', '.scala', '.c', '.cpp', '.h', '.hpp']);
+  const MAX_CODE_FILES = parseInt(process.env.CODE_CONTEXT_MAX_FILES || '100', 10);
+  const MAX_LINES_PER_FILE = parseInt(process.env.CODE_CONTEXT_MAX_LINES || '400', 10);
+
   const absoluteRoot = path.resolve(rootDir);
   const treeLines = [path.basename(absoluteRoot) + '/'];
   const flatFiles = new Set();
   const manifests = [];
   const docs = [];
+  let codeContext = '';
+  let codeFilesCount = 0;
   let detectedLicense = null;
   
   const counter = { tree: 0, flat: 0 };
-
   function walk(dir, rel, depth, prefix) {
     if (depth > MAX_TREE_DEPTH) return;
 
@@ -84,7 +93,19 @@ function scanProject(rootDir, scannerOptions = {}) {
         if (counter.tree < MAX_TREE_ENTRIES) {
           counter.tree++;
           const connector = isLast ? '└── ' : '├── ';
+          
+          // Подсчет элементов в папке для информативного отображения
+          let subCount = 0;
+          try {
+            subCount = fs.readdirSync(fullPath).filter(n => {
+               return !IGNORED_DIRS.has(n) && !n.startsWith('.git') && !IGNORED_FILES.has(n);
+            }).length;
+          } catch (e) { /* ignore */ }
+
           let treeName = name + '/';
+          if (subCount > maxFilesPerDir) {
+            treeName += ` (${subCount} элементов)`;
+          }
           treeLines.push(prefix + connector + treeName);
         }
 
@@ -92,8 +113,7 @@ function scanProject(rootDir, scannerOptions = {}) {
           const nextPrefix = prefix + (isLast ? '    ' : '│   ');
           walk(fullPath, relPath, depth + 1, nextPrefix);
         }
-      } else {
-        flatFiles.add(relPath);
+      } else {        flatFiles.add(relPath);
         counter.flat++;
 
         if (counter.tree < MAX_TREE_ENTRIES) {
@@ -129,11 +149,12 @@ function scanProject(rootDir, scannerOptions = {}) {
             else if (content.match(/BSD [23]-Clause/i)) detectedLicense = 'BSD';
             else detectedLicense = 'Custom';
           } catch (err) {
-            log.debug(`Не удалось прочитать лицензию "${name}": ${err.message}`);
+            log.warn(`Не удалось прочитать файл лицензии "${name}": ${err.message}`);
           }
         }
-
         const lowerName = name.toLowerCase();
+        const ext = path.extname(name).toLowerCase();
+
         if (docsFiles.has(lowerName) || (rel.split(path.sep).includes('docs') && lowerName.endsWith('.md'))) {
            try {
              let raw = fs.readFileSync(fullPath, 'utf8');
@@ -145,13 +166,40 @@ function scanProject(rootDir, scannerOptions = {}) {
                docs.push({ name: relPath, content: lines.join('\n') });
              }
            } catch (err) {
-             log.debug(`Не удалось прочитать документ "${relPath}": ${err.message}`);
+             log.warn(`Не удалось прочитать файл документации "${relPath}": ${err.message}`);
            }
+        }
+
+        // Сбор контекста кода (только для файлов в разрешенных папках)
+        if (collectCode && codeFilesCount < MAX_CODE_FILES && CODE_EXTS.has(ext)) {
+          const parts = relPath.split('/');
+          if (parts.length >= 2 && codePaths.includes(parts[0])) {
+            try {
+              const raw = fs.readFileSync(fullPath, 'utf8');
+              const masked = maskSensitive(raw);
+              const lines = masked.split(/\r?\n/).slice(0, MAX_LINES_PER_FILE);
+              
+              let filtered = [];
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.length > 300) continue;
+                const isComment = /^\s*\/\//.test(line) || /^\s*#/.test(line) || /^\s*\/\*/.test(line) || /^\s*\*/.test(line);
+                const isDeclaration = /^\s*(export\s+)?(function|class|interface|type|enum|const|let|var|def|pub\s+fn|public\s+class|public\s+function|public\s+static|async\s+function|private\s+|protected\s+)/i.test(line);
+                if (isComment || isDeclaration) filtered.push(trimmed);
+              }
+
+              if (filtered.length > 0) {
+                codeContext += `\n--- Файл: ${relPath} ---\n${filtered.join('\n')}\n`;
+                codeFilesCount++;
+              }
+            } catch (err) {
+              log.debug(`Не удалось прочитать код из "${relPath}": ${err.message}`);
+            }
+          }
         }
       }
     });
   }
-
   walk(rootDir, '', 1, '');
 
   if (counter.tree >= MAX_TREE_ENTRIES) {
@@ -164,7 +212,7 @@ function scanProject(rootDir, scannerOptions = {}) {
     manifests,
     detectedLicense,
     docs,
+    codeContext,
   };
 }
-
 module.exports = { scanProject };

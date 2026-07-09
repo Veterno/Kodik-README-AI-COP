@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { AiClient } = require('../../src/aiClient');
+const { AiClient } = require('../../src/generator/ai/client');
 
 jest.mock('axios');
 

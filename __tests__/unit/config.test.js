@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('../../src/config');
+const config = require('../../src/core/config');
 
 describe('Config Module', () => {
   test('should export necessary constants', () => {

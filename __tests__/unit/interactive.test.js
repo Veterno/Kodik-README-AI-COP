@@ -1,7 +1,7 @@
 'use strict';
 
 const prompts = require('prompts');
-const { runInteractive } = require('../../src/interactive');
+const { runInteractive } = require('../../src/interfaces/cli/interactive');
 
 jest.mock('prompts');
 

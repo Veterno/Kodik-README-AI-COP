@@ -1,7 +1,7 @@
 'use strict';
 
-const { DEFAULT_SECTIONS, DEFAULT_EMOJIS } = require('./config');
-const { log } = require('./logger');
+const { DEFAULT_SECTIONS, DEFAULT_EMOJIS } = require('../core/config');
+const { log } = require('../core/logger');
 
 /**
  * Локальная валидация README (без AI).

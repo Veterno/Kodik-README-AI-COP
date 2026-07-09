@@ -2,14 +2,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const config = require('../../src/config');
-const { log } = require('../../src/logger');
+const config = require('../../src/core/config');
+const { log } = require('../../src/core/logger');
 
 jest.mock('fs');
-jest.mock('../../src/logger');
+jest.mock('../../src/core/logger');
 
 // Мокаем конфиг так, чтобы мы могли менять значения динамически
-jest.mock('../../src/config', () => ({
+jest.mock('../../src/core/config', () => ({
   IGNORED_DIRS: new Set(['node_modules', '.git']),
   IGNORED_FILES: new Set(['.DS_Store']),
   // Используем геттеры для динамических значений
@@ -18,7 +18,7 @@ jest.mock('../../src/config', () => ({
   get MAX_FILES_PER_DIR() { return global.__MAX_FILES_PER_DIR || 5; }
 }));
 
-const { buildFileTree, collectFlatFileList } = require('../../src/tree');
+const { buildFileTree, collectFlatFileList } = require('../../src/scanner/projectScanner');
 
 describe('tree.js', () => {
   const rootDir = '/test-project';

@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { DEFAULT_EMOJIS, DEFAULT_SECTIONS } = require('./config');
+const { DEFAULT_EMOJIS, DEFAULT_SECTIONS } = require('../../core/config');
 
 /**
  * Собирает финальный Markdown из структурированных данных.

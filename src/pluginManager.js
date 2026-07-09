@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { pathToFileURL } = require('url');
 
 /**
@@ -35,6 +36,8 @@ class PluginManager {
         warn: (msg) => console.warn(`[Plugin] ⚠️ ${msg}`)
       }
     };
+
+    this.globalPluginsPath = path.join(os.homedir(), '.kodik', 'plugins', 'node_modules');
   }
 
   /**
@@ -45,32 +48,48 @@ class PluginManager {
       return;
     }
 
-    const { 
-      paths = [], 
-      npmPackages = [] 
-    } = this.options.plugins || {};
+    // Извлекаем список плагинов из опций (которые приходят из .kodikrc.json или CLI)
+    const pluginList = Array.isArray(this.options.plugins) ? this.options.plugins : [];
 
-    // 1. Загрузка из локальных путей
-    for (const p of paths) {
-      const absolutePath = path.resolve(process.cwd(), p);
-      await this._tryImport(absolutePath);
-    }
-
-    // 2. Загрузка из npm-пакетов
-    for (const pkgName of npmPackages) {
-      await this._tryImport(pkgName);
+    for (const pluginIdent of pluginList) {
+      await this._tryImport(pluginIdent);
     }
   }
 
   async _tryImport(pluginPath) {
     try {
-      const isPath = fs.existsSync(pluginPath);
-      const importPath = isPath
-        ? pathToFileURL(pluginPath).href
-        : pluginPath;
+      let importPath;
+      
+      // 1. Проверяем, является ли это локальным путем
+      if (pluginPath.startsWith('.') || path.isAbsolute(pluginPath)) {
+        const absolutePath = path.resolve(process.cwd(), pluginPath);
+        if (fs.existsSync(absolutePath)) {
+          importPath = pathToFileURL(absolutePath).href;
+        }
+      } 
+      
+      // 2. Если не путь, пробуем найти как npm пакет в проекте или в глобальной папке
+      if (!importPath) {
+        try {
+          // Пробуем локальный node_modules
+          importPath = require.resolve(pluginPath, { paths: [process.cwd()] });
+        } catch (e) {
+          try {
+            // Пробуем глобальную папку Kodik
+            importPath = require.resolve(pluginPath, { paths: [this.globalPluginsPath] });
+          } catch (e2) {
+            // Игнорируем, если не нашли
+          }
+        }
+      }
+
+      if (!importPath) {
+        console.error(`[PluginManager] Could not find plugin: ${pluginPath}`);
+        return;
+      }
 
       // Используем динамический import() для поддержки ESM плагинов
-      const module = await import(importPath);
+      const module = await import(pathToFileURL(importPath).href);
       const plugin = module.default || module;
       
       if (this._validatePlugin(plugin)) {

@@ -1,9 +1,8 @@
 'use strict';
 
-const { AiClient } = require('./aiClient');
-const { log } = require('./logger');
-const { validateLocal } = require('./localValidator');
-
+const { AiClient } = require('../generator/ai/client');
+const { log } = require('../core/logger');
+const { validateLocal } = require('./localRules');
 /**
  * Валидация сгенерированного README.
  * Сначала выполняется локальная проверка, затем (опционально) AI-валидация.

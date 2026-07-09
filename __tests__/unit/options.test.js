@@ -3,8 +3,8 @@
 const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
-const { resolveOptions } = require('../../src/options');
-const { DEFAULT_ANSWERS } = require('../../src/config');
+const { resolveOptions } = require('../../src/interfaces/cli/options');
+const { DEFAULT_ANSWERS } = require('../../src/core/config');
 
 jest.mock('fs');
 jest.mock('js-yaml');

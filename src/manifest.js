@@ -7,9 +7,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { MANIFEST_FILES, MAX_MANIFEST_BYTES } = require('./config');
-const { log } = require('./logger');
-
+const { MANIFEST_FILES, MAX_MANIFEST_BYTES } = require('./core/config');
+const { log } = require('./core/logger');
 function findManifest(rootDir) {
   for (const file of MANIFEST_FILES) {
     const fullPath = path.join(rootDir, file);

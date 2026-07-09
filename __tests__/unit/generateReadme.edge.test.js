@@ -1,10 +1,10 @@
 'use strict';
 
-const { generateReadme } = require('../../src/generateReadme');
-const { AiClient } = require('../../src/aiClient');
+const { generateReadme } = require('../../src/generator/readmeGenerator');
+const { AiClient } = require('../../src/generator/ai/client');
 
-jest.mock('../../src/aiClient');
-jest.mock('../../src/logger');
+jest.mock('../../src/generator/ai/client');
+jest.mock('../../src/core/logger');
 
 describe('generateReadme.js Edge Cases', () => {
   const mockOptions = {

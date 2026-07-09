@@ -3,10 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const { DEFAULT_ANSWERS, TRANSLATION_CONFIG, AI_CONFIG, CODE_PATHS, DOCS_FILES, MAX_FILES_PER_DIR, DEFAULT_SECTIONS, DEFAULT_EMOJIS } = require('./config');
-const { log } = require('./logger');
-const { maskSensitive } = require('./utils/sensitive');
-
+const { DEFAULT_ANSWERS, TRANSLATION_CONFIG, AI_CONFIG, CODE_PATHS, DOCS_FILES, MAX_FILES_PER_DIR, DEFAULT_SECTIONS, DEFAULT_EMOJIS } = require('../../core/config');
+const { log } = require('../../core/logger');
+const { maskSensitive } = require('../../utils/sensitive');
 /**
  * Объединяет настройки из разных источников с учетом приоритета:
  * 1. CLI аргументы
@@ -28,7 +27,8 @@ function resolveOptions(argv) {
   const options = {
     target: targetDir,
     output: path.resolve(targetDir, argv.output || configFromFile.output || '.'),
-    language: argv.lang || configFromFile.language || process.env.KODIK_LANG || process.env.LANG?.split('_')[0] || 'ru',    nonInteractive: argv.nonInteractive || configFromFile.nonInteractive || false,
+    language: argv.lang || configFromFile.language || process.env.KODIK_LANG || process.env.LANG?.split('_')[0] || 'ru',
+    nonInteractive: argv.nonInteractive || configFromFile.nonInteractive || false,
     dryRun: argv.dryRun || configFromFile.dryRun || false,
     validate: argv.validate || configFromFile.validate || false,
     projectName: argv.projectName || configFromFile.projectName || null,
@@ -70,10 +70,8 @@ function resolveOptions(argv) {
 
     // Настройки плагинов
     noPlugins: argv.noPlugins || configFromFile.noPlugins || false,
-    plugins: {
-      paths: argv.pluginPaths ? (Array.isArray(argv.pluginPaths) ? argv.pluginPaths : [argv.pluginPaths]) : (configFromFile.plugins?.paths || []),
-      npmPackages: argv.npmPlugins ? (Array.isArray(argv.npmPlugins) ? argv.npmPlugins : [argv.npmPlugins]) : (configFromFile.plugins?.npmPackages || [])
-    },  };
+    plugins: argv.plugins || configFromFile.plugins || [],
+  };
   // Fallback на дефолты, если списки пустые
   if (options.scanner.codePaths.length === 0) options.scanner.codePaths = CODE_PATHS;
   if (options.scanner.docsFiles.size === 0) options.scanner.docsFiles = new Set(Array.from(DOCS_FILES).map(f => f.toLowerCase()));

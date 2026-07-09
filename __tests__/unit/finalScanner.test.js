@@ -1,11 +1,11 @@
 'use strict';
 
-const { finalScan } = require('../../src/finalScanner');
-const { AiClient } = require('../../src/aiClient');
-const { log } = require('../../src/logger');
+const { finalScan } = require('../../src/output/processors/finalScanner');
+const { AiClient } = require('../../src/generator/ai/client');
+const { log } = require('../../src/core/logger');
 
-jest.mock('../../src/aiClient');
-jest.mock('../../src/logger');
+jest.mock('../../src/generator/ai/client');
+jest.mock('../../src/core/logger');
 
 describe('FinalScanner Module', () => {
   const mockOptions = {

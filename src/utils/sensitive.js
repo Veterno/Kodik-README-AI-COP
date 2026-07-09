@@ -1,6 +1,6 @@
 'use strict';
 
-const { SENSITIVE_PATTERNS } = require('../config');
+const { SENSITIVE_PATTERNS } = require('../core/config');
 
 /**
  * Проверяет строку на наличие чувствительных данных.

@@ -1,18 +1,18 @@
 'use strict';
 
 /**
- * src/mainFile.js
+ * src/scanner/entryDetector.js
  * Поиск главного файла исходного кода и чтение его первых строк.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { resolveSafePath } = require('./utils/pathUtils');
+const { resolveSafePath } = require('../utils/pathUtils');
 const {
   MAIN_FILE_CANDIDATES,
   MAX_MAIN_FILE_LINES,
-} = require('./config');
-const { log } = require('./logger');
+} = require('../core/config');
+const { log } = require('../core/logger');
 
 function findMainFile(rootDir, manifest, flatFiles) {
   const candidates = [...MAIN_FILE_CANDIDATES];
@@ -30,7 +30,8 @@ function findMainFile(rootDir, manifest, flatFiles) {
       }
     } catch (err) {
       log.debug(`Ошибка при парсинге package.json в findMainFile: ${err.message}`);
-    }  }
+    }
+  }
 
   for (const rel of candidates) {
     const normalizedRel = rel.replace(/\\/g, '/');
@@ -58,4 +59,6 @@ function findMainFile(rootDir, manifest, flatFiles) {
   }
 
   return null;
-}module.exports = { findMainFile };
+}
+
+module.exports = { findMainFile };

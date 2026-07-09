@@ -3,11 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { scanProject } = require('../../src/scanner');
-const { resolveOptions } = require('../../src/options');
-const { AiClient } = require('../../src/aiClient');
+const { scanProject } = require('../../src/scanner/projectScanner');
+const { resolveOptions } = require('../../src/interfaces/cli/options');
+const { AiClient } = require('../../src/generator/ai/client');
 
-jest.mock('../../src/logger');
+jest.mock('../../src/core/logger');
 
 describe('Edge Cases', () => {
   let tempDir;

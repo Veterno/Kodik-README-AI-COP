@@ -1,6 +1,6 @@
 'use strict';
 
-const { validateLocal, applyFixes } = require('../src/localValidator');
+const { validateLocal, applyFixes } = require('../src/validation/localRules');
 
 describe('localValidator', () => {
   const mockOptions = {

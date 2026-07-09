@@ -1,4 +1,4 @@
-const { mergeStacks } = require('../../src/utils/stackUtils');
+const { mergeStacks } = require('../../src/context/stack/detector');
 
 describe('stackUtils: mergeStacks', () => {
   test('должен объединять несколько стеков', () => {

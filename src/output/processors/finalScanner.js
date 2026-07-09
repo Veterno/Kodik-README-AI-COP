@@ -6,10 +6,9 @@
  * Если текст не соответствует целевому языку — переводит через AI.
  */
 
-const { AiClient } = require('./aiClient');
-const { log } = require('./logger');
-const { TRANSLATION_CONFIG } = require('./config');
-
+const { AiClient } = require('../../generator/ai/client');
+const { log } = require('../../core/logger');
+const { TRANSLATION_CONFIG } = require('../../core/config');
 /**
  * Основная функция финального сканирования.
  */

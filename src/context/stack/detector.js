@@ -1,24 +1,11 @@
 'use strict';
 
 /**
- * src/stackDetector.js
- * Интеллектуальный анализ стека проекта по содержимому манифеста и дерева файлов.
- *
- * Возвращает структуру:
- *   {
- *     language:        'Node.js (JavaScript)' | 'Python' | 'Go' | 'Rust' | 'Java' | 'C#' | 'PHP' | 'Ruby' | 'Dart/Flutter' | null,
- *     framework:       string | null,                  // 'Express', 'Django', ...
- *     packageManager:  string | null,                  // 'npm', 'pip', 'cargo', 'go mod', 'maven', 'gradle', 'composer', 'bundler'
- *     requirements:    string[],                       // что нужно установить заранее
- *     installCommands: string[],                       // shell-команды установки
- *     runCommands:     string[],                       // shell-команды запуска
- *     dockerSupported: boolean,                        // найден Dockerfile / docker-compose.yml
- *     dockerCommands:  string[],                       // команды Docker-запуска (если есть)
- *     extras:          string[]                        // дополнительные технологии (TypeScript, ESLint, etc.)
- *   }
+ * src/context/stack/detector.js
+ * Единый сервис для анализа стека проекта и объединения результатов.
  */
 
-const { log } = require('./logger');
+const { log } = require('../../core/logger');
 
 function safeJsonParse(text, context = 'unknown') {
   try {
@@ -28,6 +15,7 @@ function safeJsonParse(text, context = 'unknown') {
     return null;
   }
 }
+
 function includesAny(haystack, needles) {
   const lower = (haystack || '').toLowerCase();
   return needles.some((n) => lower.includes(n.toLowerCase()));
@@ -44,7 +32,8 @@ function hasFileWithExt(files, exts) {
 // ─── Детекторы по манифестам ────────────────────────────────────────────────
 
 function detectFromPackageJson(content) {
-  const pkg = safeJsonParse(content, 'package.json') || {};  const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies, pkg.peerDependencies);
+  const pkg = safeJsonParse(content, 'package.json') || {};
+  const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies, pkg.peerDependencies);
   const depNames = Object.keys(deps);
   const isTs = depNames.includes('typescript') || depNames.includes('ts-node');
 
@@ -68,7 +57,8 @@ function detectFromPackageJson(content) {
 
   const packageManager = 'npm'; // По умолчанию
 
-  const installCommands = ['npm install'];  const runCommands = [];
+  const installCommands = ['npm install'];
+  const runCommands = [];
   if (pkg.scripts && typeof pkg.scripts === 'object') {
     if (pkg.scripts.start) runCommands.push('npm start');
     else if (pkg.scripts.dev) runCommands.push('npm run dev');
@@ -174,7 +164,8 @@ function detectFromGoMod(content) {
 }
 
 function detectFromComposerJson(content) {
-  const pkg = safeJsonParse(content, 'composer.json') || {};  const deps = Object.assign({}, pkg.require, pkg['require-dev']);
+  const pkg = safeJsonParse(content, 'composer.json') || {};
+  const deps = Object.assign({}, pkg.require, pkg['require-dev']);
   const depNames = Object.keys(deps);
   let framework = null;
   if (depNames.some((d) => d.startsWith('laravel/'))) framework = 'Laravel';
@@ -366,6 +357,9 @@ function detectFromExtensions(files) {
 
 // ─── Главный диспетчер ─────────────────────────────────────────────────────
 
+/**
+ * Анализирует стек проекта на основе одного манифеста и списка файлов.
+ */
 function detectStack(manifest, flatFiles) {
   let stack = null;
 
@@ -447,6 +441,61 @@ function detectStack(manifest, flatFiles) {
   return Object.assign({ dockerSupported, dockerCommands }, stack);
 }
 
+/**
+ * Объединяет данные о стеке из нескольких манифестов.
+ */
+function mergeStacks(stacks) {
+  if (!stacks || stacks.length === 0) return null;
+
+  const result = {
+    language: [],
+    framework: [],
+    packageManager: [],
+    requirements: [],
+    installCommands: [],
+    runCommands: [],
+    extras: [],
+    dockerSupported: false,
+    dockerCommands: [],
+  };
+
+  stacks.forEach(s => {
+    if (s.language && !result.language.includes(s.language)) result.language.push(s.language);
+    if (s.framework && !result.framework.includes(s.framework)) result.framework.push(s.framework);
+    if (s.packageManager && !result.packageManager.includes(s.packageManager)) result.packageManager.push(s.packageManager);
+    
+    (s.requirements || []).forEach(r => {
+      if (!result.requirements.includes(r)) result.requirements.push(r);
+    });
+    (s.installCommands || []).forEach(c => {
+      if (!result.installCommands.includes(c)) result.installCommands.push(c);
+    });
+    (s.runCommands || []).forEach(c => {
+      if (!result.runCommands.includes(c)) result.runCommands.push(c);
+    });
+    (s.extras || []).forEach(e => {
+      if (!result.extras.includes(e)) result.extras.push(e);
+    });
+
+    if (s.dockerSupported) result.dockerSupported = true;
+    (s.dockerCommands || []).forEach(c => {
+      if (!result.dockerCommands.includes(c)) result.dockerCommands.push(c);
+    });
+  });
+
+  return {
+    language: result.language.join(', ') || null,
+    framework: result.framework.join(', ') || null,
+    packageManager: result.packageManager.join(', ') || null,
+    requirements: result.requirements,
+    installCommands: result.installCommands,
+    runCommands: result.runCommands,
+    extras: result.extras,
+    dockerSupported: result.dockerSupported,
+    dockerCommands: result.dockerCommands,
+  };
+}
+
 function formatStackHints(stack) {
   const lines = [];
   lines.push('### Определённый стек проекта');
@@ -483,4 +532,4 @@ function formatStackHints(stack) {
   return lines.join('\n');
 }
 
-module.exports = { detectStack, formatStackHints };
+module.exports = { detectStack, mergeStacks, formatStackHints };

@@ -7,9 +7,8 @@
  */
 
 const prompts = require('prompts');
-const { DEFAULT_ANSWERS } = require('./config');
-const { log } = require('./logger');
-
+const { DEFAULT_ANSWERS } = require('../../core/config');
+const { log } = require('../../core/logger');
 async function runInteractive(options, detectedLicense = null) {
   const initialAnswers = {
     ...options.answers,

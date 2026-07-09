@@ -2,13 +2,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { findMainFile } = require('../../src/mainFile');
+const { findMainFile } = require('../../src/scanner/entryDetector');
 const { resolveSafePath } = require('../../src/utils/pathUtils');
-const { MAIN_FILE_CANDIDATES, MAX_MAIN_FILE_LINES } = require('../../src/config');
+const { MAIN_FILE_CANDIDATES, MAX_MAIN_FILE_LINES } = require('../../src/core/config');
 
 jest.mock('fs');
 jest.mock('../../src/utils/pathUtils');
-jest.mock('../../src/logger');
+jest.mock('../../src/core/logger');
 
 describe('mainFile.js', () => {
   const rootDir = '/root';

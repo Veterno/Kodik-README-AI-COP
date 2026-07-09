@@ -1,4 +1,4 @@
-const { detectStack, formatStackHints } = require('../../src/stackDetector');
+const { detectStack, formatStackHints } = require('../../src/context/stack/detector');
 
 describe('stackDetector: detectStack', () => {
   test('должен определять Node.js (JavaScript) из package.json', () => {

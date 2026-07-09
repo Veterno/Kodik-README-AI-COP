@@ -3,21 +3,34 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { collectBusinessContext } = require('../../src/contextCollector');
-const { resolveSafePath } = require('../../src/utils/pathUtils');
-
-jest.mock('child_process');
-jest.mock('fs');
-jest.mock('../../src/utils/pathUtils');
-jest.mock('../../src/logger');
+const { getGitLogSummary } = require('../../src/context/contextCollector');
 
 describe('contextCollector.js', () => {
   const rootDir = '/root';
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    resolveSafePath.mockImplementation((root, rel) => path.join(root, rel));
+  describe('getGitLogSummary', () => {
+    test('should collect git context when .git exists', () => {
+      fs.existsSync.mockReturnValue(true);
+      execSync.mockReturnValue('a1b2c3d feat: add login\ne5f6a7b fix: crash\nc9d8e7f docs: update readme');
+
+      const result = getGitLogSummary(rootDir);
+
+      expect(result.features).toContain('a1b2c3d feat: add login');
+      expect(result.fixes).toContain('e5f6a7b fix: crash');
+      expect(result.docs).toContain('c9d8e7f docs: update readme');
+    });
+
+    test('should return empty git context when .git does not exist', () => {
+      fs.existsSync.mockReturnValue(false);
+      // execSync не должен вызываться, но если вызовется, вернет ошибку
+      execSync.mockImplementation(() => { throw new Error('no git'); });
+
+      const result = getGitLogSummary(rootDir);
+      expect(result.commits).toEqual([]);
+    });
   });
+});
+
 
   describe('collectBusinessContext', () => {
     it('should collect git context when .git exists', () => {

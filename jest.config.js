@@ -3,7 +3,11 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/temp_projects/',
-    '/dist/'
+    '/dist/',
+    '/.benchmark-temp/'
+  ],
+  modulePathIgnorePatterns: [
+    '<rootDir>/.benchmark-temp/'
   ],
   collectCoverageFrom: [
     'src/**/*.js',

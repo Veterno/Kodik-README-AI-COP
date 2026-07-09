@@ -1,5 +1,5 @@
-const { buildMarkdown } = require('../../src/markdownBuilder');
-const { DEFAULT_SECTIONS, DEFAULT_EMOJIS } = require('../../src/config');
+const { buildMarkdown } = require('../../src/generator/builder/markdownBuilder');
+const { DEFAULT_SECTIONS, DEFAULT_EMOJIS } = require('../../src/core/config');
 
 describe('markdownBuilder', () => {
   const data = {

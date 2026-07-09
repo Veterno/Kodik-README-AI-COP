@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { saveReadme } = require('../../src/saveReadme');
+const { saveReadme } = require('../../src/output/persistence');
 
 describe('saveReadme.js (Integration)', () => {
   let tempDir;

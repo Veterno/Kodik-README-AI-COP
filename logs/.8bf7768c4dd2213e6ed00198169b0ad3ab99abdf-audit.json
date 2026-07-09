@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 7
+    },
+    "auditLog": "C:\\Disk Aleksey\\Программирование\\Проекты\\Kodik-README-AI-COP\\logs\\.8bf7768c4dd2213e6ed00198169b0ad3ab99abdf-audit.json",
+    "files": [
+        {
+            "date": 1783595855516,
+            "name": "C:\\Disk Aleksey\\Программирование\\Проекты\\Kodik-README-AI-COP\\logs\\app-2026-07-09.log",
+            "hash": "9c3f3802c4c2d2f636afccf9e09396cc5bf6f0710af17bce771be1508fac4c66"
+        }
+    ],
+    "hashType": "sha256"
+}

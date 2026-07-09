@@ -1,4 +1,4 @@
-const { generateReadme } = require('../../src/generateReadme');
+const { generateReadme } = require('../../src/generator/readmeGenerator');
 const axios = require('axios');
 
 jest.mock('axios');
