@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 const axios = require('axios');
 const axiosRetry = require('axios-retry').default || require('axios-retry');
 const os = require('os');
-const { log } = require('./logger');
+const { log } = require('./core/logger');
 
 class InstallManager {
   constructor() {

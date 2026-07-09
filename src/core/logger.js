@@ -38,7 +38,7 @@ function initLogger() {
   const transports = [
     new winston.transports.Console({
       format: winston.format.combine(
-        winston.format.colorize(),
+        // Убираем winston.format.colorize() – управляем цветами вручную через иконки
         winston.format.printf(({ level, message }) => {
           const icons = {
             info: '\x1b[36mℹ\x1b[0m',

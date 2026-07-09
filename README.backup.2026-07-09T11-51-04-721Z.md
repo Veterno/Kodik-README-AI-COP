@@ -2,6 +2,10 @@
 
 > **Автоматическая генерация качественного README.md** с использованием AI-анализа кода и локального fallback-режима
 
+[![Node.js CI](https://github.com/yourusername/kodik-readme-ai/actions/workflows/node.js.yml/badge.svg)](https://github.com/yourusername/kodik-readme-ai/actions/workflows/node.js.yml)
+[![Coverage Status](https://codecov.io/gh/yourusername/kodik-readme-ai/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/kodik-readme-ai)
+[![npm version](https://badge.fury.io/js/kodik-readme-ai.svg)](https://badge.fury.io/js/kodik-readme-ai)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🎯 Что это?
 
