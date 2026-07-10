@@ -6,7 +6,7 @@ coverage/
 .nyc_output/
 .logs
 .benchmark-temp/
-ИИ/
+ии/
 benchmark-results/
 temp_projects/
 logs/
