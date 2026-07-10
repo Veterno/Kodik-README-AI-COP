@@ -1,103 +1,32 @@
-﻿# 📝 Kodik README AI Copilot - в этом конетксте
+# 🚀 kodik-readme-ai
 
-<p align="center">
-  <img src="https://img.shields.io/npm/v/kodik-readme-ai?style=for-the-badge&color=6366f1" alt="npm version">
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&color=6366f1" alt="License MIT">
-  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=for-the-badge&color=6366f1" alt="Node.js >= 18">
-  <br>
-  <img src="https://img.shields.io/badge/AI-OpenAI_|_Ollama_|_DeepSeek_|_Groq-8b5cf6?style=for-the-badge" alt="AI Providers">
-  <img src="https://img.shields.io/badge/стеки-20%2B-8b5cf6?style=for-the-badge" alt="Stack Detection">
-</p>
+## 📝 Описание
 
-<br>
+**kodik-readme-ai** — это веб-приложение на **Node.js (JavaScript)** с использованием **Express**. Проект ориентирован на разработчиков. Недавно добавлены: c2a79df feat: Refactor README generation process with interactive CLI and business context collection. Доступ к функциональности осуществляется через веб-интерфейс. Ключевые компоненты: path, AdmZip, simpleGit.
 
-<p align="center">
-  <b>Автоматическая генерация профессиональных README.md</b><br>
-  <i>AI-анализ кода • Локальный fallback • 20+ стеков • Веб-интерфейс • Плагины</i>
-</p>
+## ✨ Ключевые возможности
 
----
+- 🔧 Функция/Компонент: path
+- 🔧 Функция/Компонент: AdmZip
+- 🔧 Функция/Компонент: simpleGit
+- 🔧 Функция/Компонент: GenerateService
+- 🔧 Функция/Компонент: projectDir
 
-## 📖 О проекте
+## 🛠️ Стек технологий
 
-**Kodik README AI Copilot** — утилита командной строки, которая превращает код вашего проекта в качественную документацию. Она сканирует структуру, анализирует исходный код, манифесты, Git-историю и бизнес-документацию, чтобы сгенерировать исчерпывающий README.md.
-<div align="center">
+- **Язык:** Node.js (JavaScript)
+- **Фреймворк:** Express
+- **Пакетный менеджер:** npm
+- **Дополнительно:** Testing
 
-| 🧠 AI | ⚡ Локально |
-|:---:|:---:|
-| OpenAI, Ollama, DeepSeek, Groq | Встроенные шаблоны и эвристики |
-| Максимальное качество | Работает без интернета |
+## 📦 Быстрый старт
 
-</div>
+### Требования
 
----
+- Node.js v18 или новее
+- npm (входит в состав Node.js)
 
-## ✨ Возможности
-
-<table>
-<tr>
-  <td width="50%">
-
-### 🧠 AI-генерация
-
-- **OpenAI** — GPT-4o, GPT-4o-mini
-- **Ollama** — Llama, Mistral, CodeGemma
-- **DeepSeek** — DeepSeek-V3, DeepSeek-R1
-- **Groq** — Llama, Mixtral (быстрый инференс)
-- **LM Studio** — любые локальные модели
-- **Любой OpenAI-совместимый API**
-
-  </td>
-  <td width="50%">
-
-### 📂 Умный анализ
-
-- **Детектор стека** — 20+ языков и фреймворков
-- **Главный файл** — автоматический поиск точки входа
-- **Git-контекст** — анализ коммитов (`feat`, `fix`, `docs`)
-- **Бизнес-документы** — FEATURES.md, ROADMAP.md, CHANGELOG.md
-- **Кодовый контекст** — комментарии, сигнатуры, экспорты
-
-  </td>
-</tr>
-<tr>
-  <td>
-
-### 🌍 Локализация
-
-- Генерация на **6+ языках**
-- Автоматический перевод разделов
-- Интерфейс: CLI + веб на русском и английском
-
-  </td>
-  <td>
-
-### 🛡 Надёжность
-
-- **Двойная валидация** — LLM-as-a-Judge + локальные правила
-- **Маскировка секретов** — API-ключи, токены, пароли
-- **Human-friendly ошибки** — понятные подсказки
-
-  </td>
-</tr>
-</table>
-
-### 🎯 Дополнительно
-
-| Возможность | Описание |
-|---|---|
-| 🏷️ **Интерактивный режим** | Уточняет аудиторию, тон, тип проекта и ключевые фичи |
-| 🌐 **Веб-интерфейс** | Express + Bootstrap: загрузи архив или вставь GitHub-ссылку |
-| 🔌 **Плагины** | Расширение через хуки: `afterBuild`, `validate`, кастомные разделы |
-| 🎨 **Кастомизация** | Шаблоны, эмодзи, включение/выключение разделов через конфиг |
-| 📊 **Бенчмаркинг** | Автоматический прогон по репозиториям, сравнение моделей, CI-интеграция |
-| 🧪 **Тесты** | Unit, интеграционные и e2e тесты с Jest |
-
----
-
-## 🚀 Быстрый старт
-
-### 📥 Установка
+### Установка и запуск
 
 ```bash
 # Установка зависимостей
@@ -109,280 +38,137 @@ npm start
 
 ## 📂 Структура проекта
 
-```bash
-# 1. Генерация в текущей папке (базовый режим)
-kodik-readme-ai .
-
-# 2. С AI — локальный Ollama
-kodik-readme-ai . --non-interactive --api-url http://localhost:11434/v1 --model llama3.1 --api-key ollama
-
-# 3. Без AI — офлайн, встроенные шаблоны
-kodik-readme-ai . --non-interactive --ai false
+```
+Kodik-README-AI-COP/
+├── __tests__/
+│   ├── e2e/
+│   │   └── generateReadme.test.js
+│   ├── integration/
+│   │   ├── contextCollection.test.js
+│   │   ├── index.test.js
+│   │   ├── saveReadme.test.js
+│   │   └── scanner.test.js
+│   ├── unit/ (17 элементов)
+│   │   ├── aiClient.test.js
+│   │   ├── config.test.js
+│   │   ├── contextCollector.test.js
+│   │   ├── edgeCases.test.js
+│   │   ├── finalScanner.test.js
+│   │   ├── generateReadme.edge.test.js
+│   │   ├── interactive.test.js
+│   │   ├── jsonParser.test.js
+│   │   ├── logger.test.js
+│   │   ├── manifest.test.js
+│   │   ├── markdownBuilder.test.js
+│   │   ├── options.test.js
+│   │   ├── pathUtils.test.js
+│   │   ├── sensitive.test.js
+│   │   ├── stackDetector.test.js
+│   │   ├── stackUtils.test.js
+│   │   └── validator.test.js
+│   └── localValidator.test.js
+├── .kodik/
+│   └── debug/
+│       ├── dbg-FR18J7MZ441S.ndjson
+│       └── dbg-T57JXVAC3XC3.ndjson
+├── locales/
+│   ├── en.json
+│   └── ru.json
+├── logs/
+│   ├── .4dfb7c9be6ebba7c49aece986f9ca5ee5fe319aa-audit.json
+│   ├── .8bf7768c4dd2213e6ed00198169b0ad3ab99abdf-audit.json
+│   └── app-2026-07-10.log
+├── plugins/
+│   ├── authors-plugin.js
+│   └── emoji-header.js
+├── prompts/
+│   ├── readme-generation-v1.0.0.json
+│   └── readme-generation-v2.0.0.json
+├── public/
+│   ├── client.js
+│   ├── index.html
+│   └── style.css
+├── routes/
+│   └── api.js
+├── scripts/
+│   ├── benchmark.js
+│   └── reportGenerator.js
+├── services/
+│   └── generateService.js
+├── src/ (13 элементов)
+│   ├── commands/
+│   ├── context/
+│   ├── core/
+│   ├── generator/
+│   ├── interfaces/
+│   ├── output/
+│   ├── scanner/
+│   ├── utils/
+│   ├── validation/
+│   ├── index.js
+│   ├── installManager.js
+│   ├── manifest.js
+│   └── pluginManager.js
+├── ии/
+│   ├── ии/ (32 элементов)
+│   │   ├── kodik_ai_benchmarking_system_and_jest_tests.md
+│   │   ├── kodik_architecting_kodik_readme_ai_plugin_system.md
+│   │   ├── kodik_benchmark_js.md
+│   │   ├── kodik_configuring_cli_parameters_via_environment_variables.md
+│   │   ├── kodik_enhancing_readme_validation_and_auto_fix_features.md
+│   │   ├── kodik_final_readme_scanner_for_russian_translation.md
+│   │   ├── kodik_fixing_api_key_and_manifest_detection.md
+│   │   ├── kodik_fixing_code_paths_syntax_error_in_codecontext.md
+│   │   ├── kodik_fixing_duplicate_identifier_syntax_error.md
+│   │   ├── kodik_fixing_kodik_readme_ai_generation_errors.md
+│   │   ├── kodik_fixing_readme_generator_and_language_logic.md
+│   │   ├── kodik_fixing_unhandled_promise_rejection_in_readme_ai.md
+│   │   ├── kodik_generatereadme_node_js_cli.md
+│   │   ├── kodik_implementing_file_logging_for_node_js_cli.md
+│   │   ├── kodik_integrating_plugin_and_template_marketplace_commands.md
+│   │   ├── kodik_kodik_readme_ai_plugin_system_design.md
+│   │   ├── kodik_kodik_readme_ai.md
+│   │   ├── kodik_modular_refactoring_and_enhanced_error_handling.md
+│   │   ├── kodik_node_cli_readme_generator_test_implementation.md
+│   │   ├── kodik_ollama.md
+│   │   ├── kodik_readme_1.md
+│   │   ├── kodik_readme.md
+│   │   ├── kodik_redesigning_kodik_readme_ai_interface.md
+│   │   ├── kodik_refactoring_ai_client_for_multiple_providers.md
+│   │   ├── kodik_refactoring_cli_argument_parsing_and_configuration.md
+│   │   ├── kodik_refactoring_finalscanner_for_configurable_readme_translation.md
+│   │   ├── kodik_refactoring_readme_generator_and_dead_code.md
+│   │   ├── kodik_securing_nodejs_paths_against_traversal_vulnerabilities.md
+│   │   ├── kodik_standardizing_node_js_error_handling_and_logging.md
+│   │   ├── kodik_syncing_readme_title_with_package_json.md
+│   │   ├── kodik_task_transcript_2026_7_3_140142.md
+│   │   └── kodik_task_transcript_2026_7_7_151929.md
+│   └── ии.zip
+├── .gitignore
+├── app.js
+├── jest.config.js
+├── LICENSE
+├── package-lock.json
+├── package.json
+└── README.md
 ```
 
-### 🌐 Веб-интерфейс
+## 📄 Лицензия
 
-```bash
-npm run server
-# Открой http://localhost:3000
-```
+MIT
 
-Загрузи архив проекта или укажи GitHub-ссылку — получи готовый README онлайн.
+## 📖 Использование
 
----
+Содержимое раздела.
 
 ## ⚙️ Конфигурация
 
-### Переменные окружения (.env)
+Содержимое раздела.
 
-Создайте файл `.env` в корне проекта (см. `.env.example`):
+## 🔌 API
 
-```env
-# Путь к проекту
-TARGET_DIR=.
+Содержимое раздела.
 
-# Настройки AI
-USE_AI=true
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TEMPERATURE=0.7
+## 🤝 Участие в разработке
 
-# Язык генерации и перевода
-GENERATION_LANGUAGE=ru
-TARGET_LANGUAGE=ru
-TRANSLATE_SECTIONS=Описание,Ключевые возможности
-SKIP_TRANSLATION_IF_SHORT=20
-
-# Контекст кода
-CODE_CONTEXT_MAX_FILES=100
-CODE_CONTEXT_MAX_LINES=400
-
-# Логирование
-LOG_FILE=logs/app.log
-LOG_LEVEL=info
-```
-
-### Файл конфигурации (JSON/YAML)
-
-```json
-{
-  "projectName": "MyAwesomeProject",
-  "nonInteractive": true,
-  "ai": {
-    "enabled": true,
-    "model": "llama3.1",
-    "apiUrl": "http://localhost:11434/v1"
-  },
-  "content": {
-    "tone": "marketing",
-    "generationLanguage": "ru",
-    "translateSections": ["Описание", "Ключевые возможности"]
-  },
-  "answers": {
-    "audience": "developers",
-    "license": "MIT"
-  }
-}
-```
-
-Использование:
-```bash
-kodik-readme-ai . --config config.json
-```
-
----
-
-## 🎮 Использование
-
-### CLI-опции
-
-```bash
-kodik-readme-ai [target] [options]
-
-Позиционные аргументы:
-  target                Путь к проекту (по умолчанию текущая папка)
-
-Опции:
-  -t, --target          Путь к проекту
-  -n, --non-interactive Пропустить интерактивный опрос
-  --ai                  Включить AI-генерацию (true/false)
-  -m, --model           Модель AI
-  --api-url             URL API
-  --api-key             API-ключ
-  --tone                Тон описания: technical, marketing, minimal
-  -l, --language        Язык генерации
-  --no-translate        Отключить финальный перевод
-  -o, --output          Папка для сохранения README.md
-  -c, --config          Путь к файлу конфигурации
-  --validate            Запустить валидацию после генерации
-  --projectName         Явное название проекта
-  --dry-run             Показать результат без сохранения
-  --translate-section   Секции для перевода (можно указать несколько)
-  -h, --help            Показать справку
-  -v, --version         Показать версию
-```
-
-### Примеры использования
-
-```bash
-# Базовая генерация с интерактивным опросом
-kodik-readme-ai ./my-project
-
-# Тихая генерация с дефолтными настройками
-kodik-readme-ai . --non-interactive
-
-# Маркетинговый тон, английский язык
-kodik-readme-ai . --tone marketing --language en
-
-# Только локальная генерация без AI
-kodik-readme-ai . --ai false
-
-# С валидацией качества
-kodik-readme-ai . --validate
-
-# Dry-run (только показать результат)
-kodik-readme-ai . --dry-run
-
-# Использование Ollama с конкретной моделью
-kodik-readme-ai . --api-url http://localhost:11434/v1 --model llama3.1 --api-key ollama
-
-# Перевод только определённых разделов
-kodik-readme-ai . --translate-section Описание --translate-section "Ключевые возможности"
-```
-
----
-
-## 🧠 Как это работает?
-
-### Архитектура процесса
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      1. Сканирование проекта                    │
-│  • Обход файловой системы (игнорирование node_modules, .git)   │
-│  • Построение дерева папок (глубина до 4 уровней)              │
-│  • Сбор плоского списка файлов                                  │
-│  • Обнаружение манифестов (package.json, go.mod, ...)          │
-│  • Поиск лицензии (LICENSE, MIT, Apache, GPL)                  │
-│  • Сбор документации (FEATURES.md, PRODUCT.md, ...)            │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    2. Анализ контекста                         │
-│  • Определение стека технологий (stackDetector.js)            │
-│  • Поиск главного файла (mainFile.js)                         │
-│  • Сбор бизнес-контекста из Git-логов (contextCollector.js)   │
-│  • Сбор кодового контекста (codeContext.js)                   │
-│  • Интерактивный опрос (interactive.js)                       │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   3. Генерация README                           │
-│  • AI-режим: формирование JSON через LLM (AiClient)           │
-│  • Локальный режим: шаблонизация на основе эвристик            │
-│  • Сборка финального Markdown                                  │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    4. Постобработка                             │
-│  • Финальный перевод разделов (finalScanner.js)               │
-│  • Маскировка чувствительных данных (sensitive.js)            │
-│  • Сохранение в README.md (saveReadme.js)                     │
-│  • Опциональная валидация (validator.js)                      │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Детектор стека
-
-Утилита автоматически определяет язык, фреймворк и пакетный менеджер по манифестам:
-
-| Манифест | Язык | Фреймворк |
-|----------|------|-----------|
-| `package.json` | Node.js (JS/TS) | Express, Next.js, React, NestJS, Fastify, Koa, ... |
-| `requirements.txt`, `pyproject.toml` | Python | Django, Flask, FastAPI |
-| `go.mod` | Go | Gin, Echo, Fiber |
-| `Cargo.toml` | Rust | Actix-web, Rocket, Axum |
-| `pom.xml`, `build.gradle` | Java/Kotlin | Spring Boot |
-| `composer.json` | PHP | Laravel, Symfony |
-| `Gemfile` | Ruby | — |
-| `pubspec.yaml` | Dart/Flutter | Flutter |
-
-### Сбор контекста из кода
-
-- **Главный файл** — читает до 200 строк (настраивается)
-- **Дополнительные файлы** — из папок `src`, `lib`, `app`, `models`, `controllers`, `services`, `utils`, `core`, `internal`, `components`, `pages`, `hooks`, `helpers`, `modules`
-- **Фильтрация** — сохраняет только комментарии, объявления функций, классов, экспортов
-- **Лимиты** — до 100 файлов, по 400 строк каждый (настраивается)
-
-### Business-контекст
-
-- **Git-логи** — анализирует последние 30 коммитов, выделяет `feat`, `fix`, `docs`
-- **Документация** — читает файлы из списка `DOCS_FILES` (FEATURES.md, PRODUCT.md, ROADMAP.md, CHANGELOG.md и др.)
-
----
-
-## 🔧 Расширенная настройка
-
-### Настройка AI-клиента
-
-Поддерживаются любые провайдеры с OpenAI-совместимым API:
-
-```javascript
-// В коде
-const client = new AiClient({
-  apiUrl: 'https://api.openai.com/v1',
-  apiKey: 'sk-...',
-  model: 'gpt-4o-mini',
-  temperature: 0.7,
-  timeout: 60000,
-  retryAttempts: 3
-});
-```
-
-**Поддерживаемые провайдеры:**
-- **OpenAI** — `https://api.openai.com/v1`
-- **Ollama** — `http://localhost:11434/v1` (локально)
-- **LM Studio** — `http://localhost:1234/v1`
-- **Groq** — `https://api.groq.com/openai/v1`
-- **DeepSeek** — `https://api.deepseek.com/v1`
-- **Any other** — совместимый с OpenAI API
-
-### Кастомизация шаблонов
-
-В локальном режиме используются встроенные шаблоны из `generateReadme.js`. Вы можете модифицировать:
-- `buildDescription()` — структура описания
-- `buildFeaturesList()` — автодетекция функций
-- `buildQuickStart()` — команды быстрого старта
-
-### Логирование
-
-```bash
-# Включить отладочные логи
-export DEBUG=true
-
-# Установить уровень логирования
-export LOG_LEVEL=debug
-
-# Запись в файл
-export LOG_FILE=logs/app.log
-```
-
----
-
-## 🧪 Тестирование
-
-### Запуск тестов
-
-```bash
-# Все тесты
-npm test
-
-# С покрытием
-npm run test:coverage
-
-# В режиме наблюдения
-npm run test:watch
+Содержимое раздела.
