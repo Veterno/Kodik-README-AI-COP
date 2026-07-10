@@ -67,10 +67,6 @@ Kodik-README-AI-COP/
 │   │   ├── stackUtils.test.js
 │   │   └── validator.test.js
 │   └── localValidator.test.js
-├── .kodik/
-│   └── debug/
-│       ├── dbg-FR18J7MZ441S.ndjson
-│       └── dbg-T57JXVAC3XC3.ndjson
 ├── locales/
 │   ├── en.json
 │   └── ru.json
