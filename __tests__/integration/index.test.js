@@ -28,7 +28,6 @@ const { log, initLogger, closeLogger } = require('../../src/core/logger');
 const scanner = require('../../src/scanner/projectScanner');
 const interactive = require('../../src/interfaces/cli/interactive');
 const contextCollector = require('../../src/context/contextCollector');
-const codeContext = require('../../src/context/contextCollector');
 const generateReadme = require('../../src/generator/readmeGenerator');
 const saveReadme = require('../../src/output/persistence');
 const finalScanner = require('../../src/output/processors/finalScanner');
@@ -40,7 +39,6 @@ jest.mock('fs');
 jest.mock('../../src/core/logger');
 jest.mock('../../src/scanner/projectScanner');
 jest.mock('../../src/interfaces/cli/interactive');
-jest.mock('../../src/context/contextCollector');
 jest.mock('../../src/context/contextCollector');
 jest.mock('../../src/generator/readmeGenerator');
 jest.mock('../../src/output/persistence');
@@ -83,7 +81,6 @@ describe('index.js (Integration)', () => {
 
     interactive.runInteractive.mockResolvedValue({ license: 'MIT' });
     contextCollector.collectBusinessContext.mockReturnValue({});
-    codeContext.collectCodeContext.mockReturnValue('code');
     generateReadme.generateReadme.mockResolvedValue({
       markdown: '# Test',
       stack: { language: 'js' }

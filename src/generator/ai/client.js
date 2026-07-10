@@ -153,9 +153,8 @@ class AiClient {
 
     const responseText = await this.chat(messages, { 
       ...options, 
-      temperature: AI_CONFIG.JSON_TEMPERATURE 
+      temperature: options.temperature ?? AI_CONFIG.JSON_TEMPERATURE 
     });
-
     try {
       return parseJsonFromResponse(responseText);
     } catch (err) {

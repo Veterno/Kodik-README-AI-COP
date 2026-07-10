@@ -1,71 +1,78 @@
 'use strict';
 
-const fs = require('fs');
+const winston = require('winston');
 
-jest.mock('fs');
+// Мокаем winston
+jest.mock('winston', () => {
+  const mLogger = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    log: jest.fn(),
+    debug: jest.fn(),
+  };
+  return {
+    format: {
+      combine: jest.fn(),
+      timestamp: jest.fn(),
+      printf: jest.fn(),
+      colorize: jest.fn(),
+    },
+    transports: {
+      Console: jest.fn(),
+      File: jest.fn(),
+      DailyRotateFile: jest.fn(),
+    },
+    createLogger: jest.fn(() => mLogger),
+  };
+});
+
+jest.mock('winston-daily-rotate-file', () => jest.fn());
 
 describe('Logger Module', () => {
-  let consoleLogSpy, consoleWarnSpy, consoleErrorSpy;
+  let logModule;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    consoleLogSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
-  });
-
-  test('log.info should call console.log', () => {
-    const { log } = require('../../src/core/logger');    log.info('test info');
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('test info'));
-  });
-
-  test('initLogger should create directory if it does not exist', () => {
     jest.isolateModules(() => {
-      process.env.LOG_FILE = 'logs/test.log';
-      const { initLogger } = require('../../src/core/logger');      fs.existsSync.mockReturnValue(false);
-      fs.createWriteStream.mockReturnValue({ on: jest.fn(), write: jest.fn(), end: jest.fn() });
-
-      initLogger();
-
-      expect(fs.mkdirSync).toHaveBeenCalledWith(expect.any(String), { recursive: true });
+      logModule = require('../../src/core/logger');
     });
   });
 
-  test('writeToFile should write to stream if initialized', () => {
-    jest.isolateModules(() => {
-      process.env.LOG_FILE = 'logs/test.log';
-      const { log, initLogger, closeLogger } = require('../../src/core/logger');      const mockStream = { on: jest.fn(), write: jest.fn(), end: jest.fn() };
-      fs.createWriteStream.mockReturnValue(mockStream);
-      fs.existsSync.mockReturnValue(true);
-
-      initLogger();
-      log.info('test file write');
-
-      expect(mockStream.write).toHaveBeenCalledWith(expect.stringContaining('test file write'));
-      
-      closeLogger();
-      expect(mockStream.end).toHaveBeenCalled();
-    });
+  test('log.info should call winston.info', () => {
+    logModule.log.info('test info');
+    const logger = winston.createLogger();
+    expect(logger.info).toHaveBeenCalledWith('test info');
   });
 
-  test('log.debug should call console.log if DEBUG is true', () => {
-    jest.isolateModules(() => {
-      process.env.DEBUG = 'true';
-      const { log } = require('../../src/core/logger');      log.debug('debug message');
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('[DEBUG] debug message'), '');
-    });
+  test('log.warn should call winston.warn', () => {
+    logModule.log.warn('test warn');
+    const logger = winston.createLogger();
+    expect(logger.warn).toHaveBeenCalledWith('test warn');
   });
 
-  test('log.error should handle error object', () => {
-    const { log } = require('../../src/core/logger');    const error = new Error('test error');
-    log.error('failed', error);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('failed'));
+  test('log.error should call winston.error with stack', () => {
+    const error = new Error('test error');
+    logModule.log.error('failed', error);
+    const logger = winston.createLogger();
+    expect(logger.error).toHaveBeenCalledWith('failed', expect.objectContaining({ stack: error.stack }));
+  });
+
+  test('log.debug should call winston.debug', () => {
+    logModule.log.debug('debug message');
+    const logger = winston.createLogger();
+    expect(logger.debug).toHaveBeenCalledWith('debug message');
+  });
+
+  test('log.ok should call winston.log with ok level', () => {
+    logModule.log.ok('all good');
+    const logger = winston.createLogger();
+    expect(logger.log).toHaveBeenCalledWith('ok', 'all good');
+  });
+
+  test('log.step should call winston.log with step level', () => {
+    logModule.log.step('next step');
+    const logger = winston.createLogger();
+    expect(logger.log).toHaveBeenCalledWith('step', expect.stringContaining('next step'));
   });
 });
-

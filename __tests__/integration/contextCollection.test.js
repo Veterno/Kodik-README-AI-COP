@@ -63,13 +63,8 @@ describe('Context Collection Integration', () => {
 
     // 4. Collect Business Context
     const businessContext = collectBusinessContext(tempDir, docs);
-    
-    expect(businessContext.docs['FEATURES.md']).toContain('Feature A');
 
-    // 5. Collect Code Context
-    const codeContext = collectCodeContext(tempDir, flatFiles, mainFile);
-    
-    expect(codeContext).toContain('--- Файл: src/main.js ---');
-    expect(codeContext).toContain('function startServer()');
+    expect(businessContext.docs['FEATURES.md']).toContain('Feature A');
+    expect(businessContext.commits).toBeDefined();
   });
 });

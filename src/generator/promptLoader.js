@@ -7,7 +7,7 @@ const path = require('path');
  * @returns {Object} Объект с промптами
  */
 function loadPrompts(version = 'latest') {
-  const baseDir = path.join(__dirname, '../prompts');
+  const baseDir = path.join(__dirname, '../../prompts');
   if (!fs.existsSync(baseDir)) {
     throw new Error(`Директория промптов не найдена: ${baseDir}`);
   }

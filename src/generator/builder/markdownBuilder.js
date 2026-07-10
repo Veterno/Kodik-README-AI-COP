@@ -104,11 +104,27 @@ function buildSection(id, data, section, emojis) {
       }
       return qsParts.length ? `${titlePrefix}${qsParts.join('\n').trim()}` : null;
 
+    case 'usage':
+      if (!data.usage) return null;
+      return `${titlePrefix}${data.usage}`;
+
+    case 'configuration':
+      if (!data.configuration) return null;
+      return `${titlePrefix}${data.configuration}`;
+
+    case 'api':
+      if (!data.api) return null;
+      return `${titlePrefix}${data.api}`;
+
     case 'projectStructure':
       if (!data.projectStructure) return null;
       const structure = String(data.projectStructure);
       const formattedStructure = structure.startsWith('```') ? structure : `\`\`\`\n${structure}\n\`\`\``;
       return `${titlePrefix}${formattedStructure}`;
+
+    case 'contributing':
+      if (!data.contributing) return null;
+      return `${titlePrefix}${data.contributing}`;
 
     case 'license':
       if (!data.license) return null;

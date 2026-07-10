@@ -50,8 +50,24 @@ async function generateReadme(params) {
 /**
  * Внутренняя функция для вызова AI.
  */
+/**
+ * Определяет, пропустил ли пользователь опрос (все ответы дефолтные/пустые).
+ */
+function isEmptySurvey(interactiveAnswers) {
+  if (!interactiveAnswers) return true;
+  // Если текстовые поля пустые, а селекты — первый (дефолтный) вариант
+  const valueEmpty = !interactiveAnswers.value || interactiveAnswers.value.trim() === '';
+  const featuresEmpty = !interactiveAnswers.keyFeatures || interactiveAnswers.keyFeatures.trim() === '';
+  const audienceDefault = interactiveAnswers.audience === 'developers';
+  const toneDefault = interactiveAnswers.tone === 'technical';
+  const projectTypeDefault = interactiveAnswers.projectType === 'web';
+  return valueEmpty && featuresEmpty && audienceDefault && toneDefault && projectTypeDefault;
+}
+
 async function generateWithAI(params, stack) {
   const { projectName, tree, manifests, mainFile, businessContext, interactiveAnswers, codeContext, detectedLicense, options } = params;
+
+  const surveyEmpty = isEmptySurvey(interactiveAnswers);
 
   const context = buildContextString({
     projectName,
@@ -62,8 +78,8 @@ async function generateWithAI(params, stack) {
     interactiveAnswers,
     stack,
     codeContext,
+    surveyEmpty,
   });
-
   const tone = interactiveAnswers?.tone || options.content.tone || 'technical';
   const licenseName = detectedLicense || interactiveAnswers?.license || options.answers.license || 'MIT';
   const genLang = options.content?.generationLanguage || 'ru';
@@ -93,9 +109,14 @@ async function generateWithAI(params, stack) {
 
   const userPrompt = prompts.userPromptTemplate.replace('{{context}}', context);
 
-  const client = new AiClient(options.ai);
-  const jsonResult = await client.generateReadme({ systemPrompt, userPrompt }, { json: true });
+  // Используем температуру из промпта, если задана, иначе из конфига
+  const promptTemperature = typeof prompts.temperature === 'number' ? prompts.temperature : undefined;
 
+  const client = new AiClient(options.ai);
+  const jsonResult = await client.generateReadme(
+    { systemPrompt, userPrompt },
+    { json: true, temperature: promptTemperature }
+  );
   if (!jsonResult || typeof jsonResult !== 'object' || !jsonResult.title) {
     throw new Error('Невалидный ответ от AI');
   }
@@ -105,10 +126,15 @@ async function generateWithAI(params, stack) {
 /**
  * Строит текстовый контекст для AI-генерации.
  */
-function buildContextString({ projectName, tree, manifests, mainFile, businessContext, interactiveAnswers, stack, codeContext }) {
+function buildContextString({ projectName, tree, manifests, mainFile, businessContext, interactiveAnswers, stack, codeContext, surveyEmpty }) {
   const parts = [];
-  parts.push(`Имя проекта: ${projectName}`);
-  if (manifests && manifests.length > 0) {
+
+  // Если опрос пропущен — добавляем предупреждение для AI в самое начало
+  if (surveyEmpty) {
+    parts.push('[ВНИМАНИЕ: пользователь пропустил опрос — все ответы дефолтные. Игнорируй раздел «ответы пользователя» ниже и полностью положитесь на свой анализ кода, структуры проекта, манифестов и git-истории. Прояви максимум креативности и сделай обоснованные выводы самостоятельно.]');
+  }
+
+  parts.push(`Имя проекта: ${projectName}`);  if (manifests && manifests.length > 0) {
     parts.push('Манифесты:');
     manifests.forEach(m => {
       parts.push(`--- ${m.relPath || m.name} ---\n${m.content}`);

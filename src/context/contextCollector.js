@@ -1,8 +1,10 @@
 'use strict';
 
 const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const { log } = require('../core/logger');
-
+const { DOCS_FILES } = require('../core/config');
 /**
  * Собирает сводку из Git-лога.
  */
@@ -20,4 +22,42 @@ function getGitLogSummary(rootDir) {
   }
 }
 
-module.exports = { getGitLogSummary };
+module.exports = { getGitLogSummary, collectBusinessContext };
+
+/**
+ * Собирает бизнес-контекст проекта (Git + документация).
+ */
+function collectBusinessContext(rootDir, scannedDocs = []) {
+  const gitContext = getGitLogSummary(rootDir);
+  const docs = {};
+
+  if (scannedDocs && scannedDocs.length > 0) {
+    scannedDocs.forEach(doc => {
+      const lowerName = doc.name.toLowerCase();
+      if (DOCS_FILES.has(lowerName) || lowerName.endsWith('.md')) {
+        if (lowerName !== 'readme.md') {
+          docs[doc.name] = doc.content;
+        }
+      }
+    });
+  } else {
+    try {
+      const files = fs.readdirSync(rootDir);
+      files.forEach(file => {
+        const lowerName = file.toLowerCase();
+        if ((DOCS_FILES.has(lowerName) || lowerName.endsWith('.md')) && lowerName !== 'readme.md') {
+          const fullPath = path.join(rootDir, file);
+          if (fs.statSync(fullPath).isFile()) {
+            docs[file] = fs.readFileSync(fullPath, 'utf8').slice(0, 5000);
+          }
+        }
+      });
+    } catch (err) {      log.debug(`Ошибка при ручном сборе документации: ${err.message}`);
+    }
+  }
+
+  return {
+    ...gitContext,
+    docs
+  };
+}

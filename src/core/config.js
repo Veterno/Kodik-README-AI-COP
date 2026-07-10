@@ -19,7 +19,7 @@ const IGNORED_FILES = new Set([
   '.env.development',
   '.env.test',
   '.env.production',
-  '.env.example', // Мы его почистим, но лучше исключить из сканирования кода
+  '.env.example', 
 ]);
 
 const SENSITIVE_PATTERNS = [
@@ -102,20 +102,26 @@ const DEFAULT_SECTIONS = [
   { id: 'features', title: 'Ключевые возможности', order: 30, enabled: true },
   { id: 'stack', title: 'Стек технологий', order: 40, enabled: true },
   { id: 'quickStart', title: 'Быстрый старт', order: 50, enabled: true },
+  { id: 'usage', title: 'Использование', order: 55, enabled: true },
+  { id: 'configuration', title: 'Конфигурация', order: 57, enabled: true },
+  { id: 'api', title: 'API', order: 58, enabled: true },
   { id: 'projectStructure', title: 'Структура проекта', order: 60, enabled: true },
+  { id: 'contributing', title: 'Участие в разработке', order: 65, enabled: true },
   { id: 'license', title: 'Лицензия', order: 70, enabled: true },
 ];
-
 const DEFAULT_EMOJIS = {
   title: '🚀',
   description: '📝',
   features: '✨',
   stack: '🛠️',
   quickStart: '📦',
+  usage: '📖',
+  configuration: '⚙️',
+  api: '🔌',
   projectStructure: '📂',
+  contributing: '🤝',
   license: '📄'
 };
-
 module.exports = {
   IGNORED_DIRS,
   IGNORED_FILES,

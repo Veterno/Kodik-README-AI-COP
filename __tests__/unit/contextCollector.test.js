@@ -3,13 +3,15 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { getGitLogSummary } = require('../../src/context/contextCollector');
+const { getGitLogSummary, collectBusinessContext } = require('../../src/context/contextCollector');
 
+jest.mock('fs');
+jest.mock('child_process');
+jest.mock('../../src/core/logger');
 describe('contextCollector.js', () => {
   const rootDir = '/root';
 
-  describe('getGitLogSummary', () => {
-    test('should collect git context when .git exists', () => {
+  describe('getGitLogSummary', () => {    test('should collect git context when .git exists', () => {
       fs.existsSync.mockReturnValue(true);
       execSync.mockReturnValue('a1b2c3d feat: add login\ne5f6a7b fix: crash\nc9d8e7f docs: update readme');
 
@@ -29,11 +31,8 @@ describe('contextCollector.js', () => {
       expect(result.commits).toEqual([]);
     });
   });
-});
 
-
-  describe('collectBusinessContext', () => {
-    it('should collect git context when .git exists', () => {
+  describe('collectBusinessContext', () => {    it('should collect git context when .git exists', () => {
       fs.existsSync.mockImplementation((p) => p.endsWith('.git'));
       execSync.mockReturnValue('a1b2c3d feat: add login\ne5f6a7b fix: crash\nc9d8e7f docs: update readme');
 
@@ -46,11 +45,10 @@ describe('contextCollector.js', () => {
 
     it('should return empty git context when .git does not exist', () => {
       fs.existsSync.mockReturnValue(false);
+      execSync.mockReturnValue(''); // Важно очистить вывод execSync
 
       const result = collectBusinessContext(rootDir);
-
-      expect(result.commits).toEqual([]);
-      expect(result.features).toEqual([]);
+      expect(result.commits).toEqual([]);      expect(result.features).toEqual([]);
     });
 
     it('should collect doc files from scannedDocs', () => {
@@ -67,14 +65,15 @@ describe('contextCollector.js', () => {
     });
 
     it('should fallback to reading files from disk if scannedDocs is missing', () => {
+      fs.readdirSync.mockReturnValue(['PRODUCT.md']);
       fs.existsSync.mockImplementation((p) => p.endsWith('PRODUCT.md'));
+      fs.statSync.mockReturnValue({ isFile: () => true });
       fs.readFileSync.mockReturnValue('# Product Title\n- Bullet point');
 
       const result = collectBusinessContext(rootDir);
 
       expect(result.docs['PRODUCT.md']).toBe('# Product Title\n- Bullet point');
     });
-
     it('should handle git errors gracefully', () => {
       fs.existsSync.mockImplementation((p) => p.endsWith('.git'));
       execSync.mockImplementation(() => {
