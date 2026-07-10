@@ -2,7 +2,7 @@
 
 ## 📝 Описание
 
-**kodik-readme-ai** — это веб-приложение на **Node.js (JavaScript)** с использованием **Express**. Проект ориентирован на разработчиков. Недавно добавлены: c2a79df feat: Refactor README generation process with interactive CLI and business context collection. Доступ к функциональности осуществляется через веб-интерфейс. Ключевые компоненты: path, AdmZip, simpleGit.
+**kodik-readme-ai** — это веб-приложение на **Node.js (JavaScript)** с использованием **Express**. Проект ориентирован на разработчиков. Доступ к функциональности осуществляется через веб-интерфейс. Ключевые компоненты: path, AdmZip, simpleGit.
 
 ## ✨ Ключевые возможности
 
@@ -76,7 +76,6 @@ Kodik-README-AI-COP/
 │   └── ru.json
 ├── logs/
 │   ├── .4dfb7c9be6ebba7c49aece986f9ca5ee5fe319aa-audit.json
-│   ├── .8bf7768c4dd2213e6ed00198169b0ad3ab99abdf-audit.json
 │   └── app-2026-07-10.log
 ├── plugins/
 │   ├── authors-plugin.js
