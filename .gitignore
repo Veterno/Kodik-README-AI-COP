@@ -6,8 +6,8 @@ coverage/
 .nyc_output/
 .logs
 .benchmark-temp/
-.ИИ/
+ИИ/
 benchmark-results/
-.temp_projects/
-.logs/
-.kodik/debug/
+temp_projects/
+logs/
+kodik/debug/
