@@ -8,3 +8,6 @@ coverage/
 .benchmark-temp/
 .ИИ/
 benchmark-results/
+.temp_projects/
+.logs/
+.kodik/debug/
