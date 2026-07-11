@@ -1,5 +1,7 @@
 # 📝 Kodik README AI Copilot
 
+> 🌐 [English version](README_EN.md)
+
 <p align="center">
   <img src="https://img.shields.io/npm/v/kodik-readme-ai?style=for-the-badge&color=6366f1" alt="npm version">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&color=6366f1" alt="License MIT">
