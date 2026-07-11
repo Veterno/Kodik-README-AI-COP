@@ -123,8 +123,10 @@ const log = {
 };
 
 function closeLogger() {
-  // Winston автоматически закрывает транспорты, но мы можем явно обнулить ссылку
-  winstonLogger = null;
+  if (winstonLogger) {
+    winstonLogger.end();
+    winstonLogger = null;
+  }
 }
 
 module.exports = { 

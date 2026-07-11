@@ -69,9 +69,35 @@ async function finalScan(markdown, options) {
 }
 
 /**
- * Улучшенная эвристика определения языка.
- * Проверяет, преобладает ли в тексте алфавит, отличный от целевого.
+ * Определяет доминирующую письменность текста по Unicode-диапазонам.
+ * @param {string} text
+ * @returns {string|null} 'latin', 'cyrillic', 'cjk' или null
  */
+function getDominantScript(text) {
+  let latin = 0, cyrillic = 0, cjk = 0;
+
+  for (const ch of text) {
+    const code = ch.codePointAt(0);
+    if ((code >= 0x0041 && code <= 0x005A) || (code >= 0x0061 && code <= 0x007A)) {
+      latin++;
+    } else if (code >= 0x0400 && code <= 0x04FF) {
+      cyrillic++;
+    } else if (
+      (code >= 0x4E00 && code <= 0x9FFF) || // CJK Unified
+      (code >= 0x3040 && code <= 0x309F) || // Hiragana
+      (code >= 0x30A0 && code <= 0x30FF)    // Katakana
+    ) {
+      cjk++;
+    }
+  }
+
+  const max = Math.max(latin, cyrillic, cjk);
+  if (max === 0) return null;
+  if (max === latin) return 'latin';
+  if (max === cyrillic) return 'cyrillic';
+  return 'cjk';
+}
+
 function shouldTranslate(text, targetLang) {
   const cleanText = text.replace(/`[^`]+`/g, '') // Убираем инлайн-код
                          .replace(/```[\s\S]*?```/g, ''); // Убираем блоки кода
@@ -91,8 +117,24 @@ function shouldTranslate(text, targetLang) {
     return cyrillicCount > 10;
   }
 
-  // Для других языков пока полагаемся на то, что если текст преимущественно латинский 
-  // и цель не английский — возможно, стоит перевести (упрощенно)
+  // Для других языков: определяем доминирующую письменность и сверяем с целевым языком
+  const scriptMap = {
+    latin: ['en', 'es', 'fr', 'de', 'it', 'pt'],
+    cyrillic: ['ru', 'uk', 'be', 'bg', 'sr'],
+    cjk: ['zh', 'ja', 'ko']
+  };
+
+  const dominantScript = getDominantScript(cleanText);
+  const targetScript = Object.keys(scriptMap).find(script =>
+    scriptMap[script].includes(targetLang)
+  );
+
+  // Если доминирующая письменность текста совпадает с целевым языком — не переводим
+  if (dominantScript && targetScript && dominantScript === targetScript) {
+    return false;
+  }
+
+  // Несовпадение письменности или не удалось определить — переводим
   return true;
 }
 

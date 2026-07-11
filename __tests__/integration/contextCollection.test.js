@@ -5,8 +5,8 @@ const path = require('path');
 const os = require('os');
 const { scanProject } = require('../../src/scanner/projectScanner');
 const { detectStack } = require('../../src/context/stack/detector');
-const { findMainFile } = require('../../src/scanner/entryDetector');const { collectBusinessContext } = require('../../src/context/contextCollector');
-const { collectCodeContext } = require('../../src/context/contextCollector');
+const { findMainFile } = require('../../src/scanner/entryDetector');
+const { collectBusinessContext } = require('../../src/context/contextCollector');
 
 describe('Context Collection Integration', () => {
   let tempDir;

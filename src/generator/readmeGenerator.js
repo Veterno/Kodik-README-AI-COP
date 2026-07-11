@@ -36,7 +36,7 @@ async function generateReadme(params) {
   }
 
   if (!readmeData) {
-    readmeData = generateLocal(params);
+    readmeData = generateLocal(params, stack);
   }
 
   const markdown = buildMarkdown(readmeData, options);

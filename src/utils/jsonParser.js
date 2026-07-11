@@ -43,16 +43,36 @@ function parseJsonFromResponse(text) {
 
   if (startIdx !== -1) {
     let balance = 0;
+    let inString = false;
+    let stringQuote = '';
+
     for (let i = startIdx; i < text.length; i++) {
-      if (text[i] === opener) balance++;
-      if (text[i] === closer) balance--;
-      
+      const ch = text[i];
+
+      if (inString) {
+        if (ch === '\\') {
+          i++; // Пропускаем экранированный символ
+        } else if (ch === stringQuote) {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'") {
+        inString = true;
+        stringQuote = ch;
+        continue;
+      }
+
+      if (ch === opener) balance++;
+      if (ch === closer) balance--;
+
       if (balance === 0) {
         const potentialJson = text.substring(startIdx, i + 1);
         try {
           return JSON.parse(potentialJson);
         } catch (e) {
-          // Игнорируем и ищем дальше, если это была ложная скобка
+          // Невалидный JSON — ищем следующий сбалансированный блок
         }
       }
     }

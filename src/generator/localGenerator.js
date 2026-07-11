@@ -5,13 +5,18 @@ const { log } = require('../core/logger');
 
 /**
  * Локальная генерация данных для README (без AI).
+ * @param {object} params - параметры генерации
+ * @param {object} [precomputedStack] - предварительно вычисленный стек (чтобы избежать двойной детекции)
  */
-function generateLocal({ projectName, tree, flatFiles, manifests, mainFile, interactiveAnswers, businessContext, detectedLicense, codeContext, options }) {
-  const stacks = manifests && manifests.length > 0 
-    ? manifests.map(m => detectStack(m, flatFiles))
-    : [detectStack(null, flatFiles)];
+function generateLocal(params, precomputedStack) {
+  const { projectName, tree, flatFiles, manifests, mainFile, interactiveAnswers, businessContext, detectedLicense, codeContext, options } = params;
   
-  const stack = mergeStacks(stacks);
+  const stack = precomputedStack || (() => {
+    const stacks = manifests && manifests.length > 0 
+      ? manifests.map(m => detectStack(m, flatFiles))
+      : [detectStack(null, flatFiles)];
+    return mergeStacks(stacks);
+  })();
   const tone = interactiveAnswers?.tone || options?.content?.tone || 'technical';
 
   const codeFunctions = extractFunctionsFromCode(codeContext);

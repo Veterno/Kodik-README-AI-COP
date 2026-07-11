@@ -44,12 +44,21 @@ function scanProject(rootDir, scannerOptions = {}) {
   let detectedLicense = null;
   
   const counter = { tree: 0, flat: 0 };
+  const dirCache = new Map();
+
+  function readDirCached(dirPath) {
+    if (dirCache.has(dirPath)) return dirCache.get(dirPath);
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    dirCache.set(dirPath, entries);
+    return entries;
+  }
+
   function walk(dir, rel, depth, prefix) {
     if (depth > MAX_TREE_DEPTH) return;
 
     let entries;
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = readDirCached(dir);
     } catch (err) {
       log.warn(`Не удалось прочитать папку "${dir}": ${err.message}`);
       return;
@@ -97,8 +106,9 @@ function scanProject(rootDir, scannerOptions = {}) {
           // Подсчет элементов в папке для информативного отображения
           let subCount = 0;
           try {
-            subCount = fs.readdirSync(fullPath).filter(n => {
-               return !IGNORED_DIRS.has(n) && !n.startsWith('.git') && !IGNORED_FILES.has(n);
+            const subEntries = readDirCached(fullPath);
+            subCount = subEntries.filter(e => {
+              return !IGNORED_DIRS.has(e.name) && !e.name.startsWith('.git') && !IGNORED_FILES.has(e.name);
             }).length;
           } catch (e) { /* ignore */ }
 

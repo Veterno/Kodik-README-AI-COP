@@ -171,8 +171,8 @@ LOG_LEVEL=info
   "nonInteractive": true,
   "ai": {
     "enabled": true,
-    "model": "llama3.1",
-    "apiUrl": "http://localhost:11434/v1"
+"model": "gpt-4o-mini",
+    "apiUrl": "https://api.openai.com/v1"
   },
   "content": {
     "tone": "marketing",
@@ -272,9 +272,9 @@ kodik-readme-ai . --translate-section Описание --translate-section "Кл
 ┌─────────────────────────────────────────────────────────────────┐
 │                    2. Анализ контекста                         │
 │  • Определение стека технологий (stackDetector.js)            │
-│  • Поиск главного файла (mainFile.js)                         │
+│  • Поиск главного файла (entryDetector.js)                   │
 │  • Сбор бизнес-контекста из Git-логов (contextCollector.js)   │
-│  • Сбор кодового контекста (codeContext.js)                   │
+│  • Сбор кодового контекста (projectScanner.js)                │
 │  • Интерактивный опрос (interactive.js)                       │
 └─────────────────────────────────────────────────────────────────┘
                                 │
@@ -353,10 +353,10 @@ const client = new AiClient({
 
 ### Кастомизация шаблонов
 
-В локальном режиме используются встроенные шаблоны из `generateReadme.js`. Вы можете модифицировать:
+В локальном режиме используются встроенные шаблоны из `localGenerator.js`. Вы можете модифицировать:
 - `buildDescription()` — структура описания
 - `buildFeaturesList()` — автодетекция функций
-- `buildQuickStart()` — команды быстрого старта
+- `buildQuickStartData()` — команды быстрого старта
 
 ### Логирование
 

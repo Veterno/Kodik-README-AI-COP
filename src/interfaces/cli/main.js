@@ -86,19 +86,19 @@ async function main(customArgv) {
       describe: 'Тон описания',
       choices: ['technical', 'marketing', 'minimal'],
       type: 'string'
-    })    .option('l', {
+    })
+    .option('l', {
       alias: 'language',
       describe: 'Язык для перевода',
+      type: 'string'
+    })
+    .option('target-language', {
+      describe: 'Целевой язык итогового README',
       type: 'string'
     })
     .option('no-translate', {
       describe: 'Отключить финальный перевод',
       type: 'boolean'
-    })
-    .option('o', {
-      alias: 'output',
-      describe: 'Папка для сохранения README.md',
-      type: 'string'
     })
     .option('c', {
       alias: 'config',
@@ -112,7 +112,8 @@ async function main(customArgv) {
     .option('fix', {
       describe: 'Автоматически исправлять ошибки в README (требует --validate)',
       type: 'boolean'
-    })    .option('projectName', {
+    })
+    .option('projectName', {
       describe: 'Явное название проекта (переопределяет package.json)',
       type: 'string'
     })
@@ -120,9 +121,6 @@ async function main(customArgv) {
       describe: 'Версия промптов (latest или номер)',
       type: 'string',
       default: 'latest'
-    })
-    .option('dry-run', {      describe: 'Показать результат без сохранения',
-      type: 'boolean'
     })
     .option('translate-section', {
       describe: 'Секции для перевода (можно несколько)',
@@ -276,9 +274,13 @@ async function main(customArgv) {
   log.step('Шаг 5/6. Собираю бизнес-контекст (Git-логи, документы)…');
   let businessContext = { commits: [], features: [], fixes: [], docs: {} };
   try {
-    businessContext = collectBusinessContext(targetDir, docs);    log.ok('Бизнес-контекст и контекст кода собраны.');  } catch (err) {
+    businessContext = collectBusinessContext(targetDir, docs);
+    log.ok('Бизнес-контекст и контекст кода собраны.');
+  } catch (err) {
     log.warn(`Ошибка при сборе контекста: ${err.message}. Продолжаю с ограниченным контекстом.`);
-  }  // 6. Генерация README
+  }
+
+  // 6. Генерация README
   log.step('Шаг 6/6. Генерирую README…');
   let markdown;
   let stack;
@@ -340,7 +342,7 @@ async function main(customArgv) {
           fs.copyFileSync(outPath, backupPath);
           log.info(`Создана резервная копия: ${backupPath}`);
         }
-        markdown = applyFixes(markdown, localReport.fixes);
+        markdown = applyFixes(markdown, localReport.fixes, options.content.sections);
         log.ok(`Применено исправлений: ${localReport.fixes.length}`);
       } else {
         log.info('Исправления не требуются.');

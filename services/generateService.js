@@ -8,13 +8,12 @@ const simpleGit = require('simple-git');
 const { rimraf } = require('rimraf');
 
 // Импортируем существующие модули из src
-const { scanProject } = require('../src/scanner');
-const { findMainFile } = require('../src/mainFile');
-const { collectBusinessContext } = require('../src/contextCollector');
-const { collectCodeContext } = require('../src/codeContext');
-const { generateReadme } = require('../src/generateReadme');
-const { finalScan } = require('../src/finalScanner');
-const { resolveOptions } = require('../src/options');
+const { scanProject } = require('../src/scanner/projectScanner');
+const { findMainFile } = require('../src/scanner/entryDetector');
+const { collectBusinessContext } = require('../src/context/contextCollector');
+const { generateReadme } = require('../src/generator/readmeGenerator');
+const { finalScan } = require('../src/output/processors/finalScanner');
+const { resolveOptions } = require('../src/interfaces/cli/options');
 
 /**
  * Сервис для управления процессом генерации README через веб-интерфейс.
@@ -84,7 +83,7 @@ class GenerateService {
       // 3. Scanning
       onProgress({ step: 'scan', message: 'Scanning project structure...' });
       const scanResult = scanProject(projectDir, options.scanner);
-      const { tree, flatFiles, manifests, detectedLicense, docs } = scanResult;
+      const { tree, flatFiles, manifests, detectedLicense, docs, codeContext } = scanResult;
 
       // Project name detection
       let projectName = 'project';
@@ -109,7 +108,6 @@ class GenerateService {
 
       // 5. Collect context
       const businessContext = collectBusinessContext(projectDir, docs);
-      const codeContext = collectCodeContext(projectDir, Array.from(flatFiles), mainFile, options.scanner.codePaths);
 
       // 6. Generation
       onProgress({ step: 'generate', message: 'Generating README content...' });

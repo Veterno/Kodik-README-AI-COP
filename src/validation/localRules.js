@@ -121,15 +121,25 @@ function validateLocal(markdown, options = {}) {
 
 /**
  * Применяет исправления к тексту README.
+ * @param {string} markdown - исходный текст
+ * @param {Array} fixes - список исправлений
+ * @param {Array} [sections] - секции с полем order для правильной вставки
  */
-function applyFixes(markdown, fixes) {
+function applyFixes(markdown, fixes, sections = []) {
   let result = markdown;
+
+  // Строим маппинг: sectionId → order
+  const orderMap = {};
+  for (const s of sections) {
+    if (s.id && s.order !== undefined) orderMap[s.id] = s.order;
+  }
 
   for (const fix of fixes) {
     if (fix.type === 'add_section') {
       const emojiPart = fix.emoji ? `${fix.emoji} ` : '';
       const defaultContent = generateDefaultContent(fix.sectionId);
-      result = result.trim() + `\n\n## ${emojiPart}${fix.sectionTitle}\n\n${defaultContent}\n`;
+      const newSection = `\n## ${emojiPart}${fix.sectionTitle}\n\n${defaultContent}\n`;
+      result = insertSectionAtPosition(result, fix, newSection, orderMap, sections);
       log.info(`[Fix] Добавлен раздел: ${fix.sectionTitle}`);
     }
 
@@ -140,6 +150,66 @@ function applyFixes(markdown, fixes) {
   }
 
   return result;
+}
+
+/**
+ * Вставляет новый раздел в правильную позицию согласно order.
+ */
+function insertSectionAtPosition(markdown, fix, newSection, orderMap, sections) {
+  const targetOrder = orderMap[fix.sectionId] || 999;
+
+  // Строим маппинг: title (без эмодзи) → order
+  const titleOrderMap = {};
+  for (const s of sections) {
+    if (s.title && s.order !== undefined) {
+      titleOrderMap[s.title.toLowerCase()] = s.order;
+    }
+  }
+
+  // Ищем все заголовки ## в markdown и их позиции
+  const headingRegex = /^(##\s+(?:\S+\s+)?(.+))$/gm;
+  const headings = [];
+  let match;
+  while ((match = headingRegex.exec(markdown)) !== null) {
+    const titlePart = match[2].toLowerCase();
+    const order = titleOrderMap[titlePart] || 999;
+    headings.push({ index: match.index, fullMatch: match[0], title: titlePart, order });
+  }
+
+  // Найти позицию для вставки: после последнего с order <= targetOrder
+  let insertAfter = -1; // -1 означает «вставить в начало» (после заголовка первого уровня, если есть)
+  let insertBefore = -1;
+
+  for (let i = 0; i < headings.length; i++) {
+    if (headings[i].order <= targetOrder) {
+      insertAfter = headings[i].index + headings[i].fullMatch.length;
+    } else {
+      insertBefore = headings[i].index;
+      break;
+    }
+  }
+
+  if (insertAfter >= 0 && insertBefore >= 0) {
+    // Вставляем между insertAfter и insertBefore
+    return markdown.slice(0, insertAfter) + '\n' + newSection + markdown.slice(insertBefore);
+  }
+
+  if (insertAfter >= 0) {
+    // Вставляем после последнего подходящего раздела
+    const before = markdown.slice(0, insertAfter);
+    const after = markdown.slice(insertAfter);
+    return before + '\n' + newSection + after;
+  }
+
+  // Нет подходящих разделов — ищем заголовок первого уровня (# )
+  const h1Match = markdown.match(/^#\s+.+$/m);
+  if (h1Match) {
+    const idx = markdown.indexOf(h1Match[0]) + h1Match[0].length;
+    return markdown.slice(0, idx) + '\n' + newSection + markdown.slice(idx);
+  }
+
+  // Вообще нет заголовков — добавляем в конец
+  return markdown.trimEnd() + '\n' + newSection;
 }
 
 /**

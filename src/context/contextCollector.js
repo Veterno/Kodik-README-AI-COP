@@ -22,8 +22,6 @@ function getGitLogSummary(rootDir) {
   }
 }
 
-module.exports = { getGitLogSummary, collectBusinessContext };
-
 /**
  * Собирает бизнес-контекст проекта (Git + документация).
  */
@@ -61,3 +59,5 @@ function collectBusinessContext(rootDir, scannedDocs = []) {
     docs
   };
 }
+
+module.exports = { getGitLogSummary, collectBusinessContext };

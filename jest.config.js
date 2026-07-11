@@ -11,7 +11,7 @@ module.exports = {
   ],
   collectCoverageFrom: [
     'src/**/*.js',
-    '!src/logger.js'
+    '!src/core/logger.js'
   ],
   coverageDirectory: 'coverage',
   verbose: true

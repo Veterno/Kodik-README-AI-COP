@@ -7,7 +7,7 @@ class I18n {
   constructor() {
     this.locale = 'ru';
     this.translations = {};
-    this.localesPath = path.join(__dirname, '../locales');
+    this.localesPath = path.join(__dirname, '../../locales');
   }
 
   /**
