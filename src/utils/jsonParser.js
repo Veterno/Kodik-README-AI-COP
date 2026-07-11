@@ -72,7 +72,29 @@ function parseJsonFromResponse(text) {
         try {
           return JSON.parse(potentialJson);
         } catch (e) {
-          // Невалидный JSON — ищем следующий сбалансированный блок
+          // Невалидный JSON — сбрасываем состояние и ищем следующий блок
+          balance = 0;
+          inString = false;
+          stringQuote = '';
+          
+          // Ищем следующий открывающий символ
+          const nextBrace = text.indexOf('{', i + 1);
+          const nextBracket = text.indexOf('[', i + 1);
+          
+          if (nextBrace !== -1 && (nextBracket === -1 || nextBrace < nextBracket)) {
+            startIdx = nextBrace;
+            opener = '{';
+            closer = '}';
+            i = nextBrace - 1; // -1, так как цикл сделает i++
+          } else if (nextBracket !== -1) {
+            startIdx = nextBracket;
+            opener = '[';
+            closer = ']';
+            i = nextBracket - 1; // -1, так как цикл сделает i++
+          } else {
+            // Больше нет открывающих скобок — выходим
+            break;
+          }
         }
       }
     }

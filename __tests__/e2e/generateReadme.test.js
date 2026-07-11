@@ -1,7 +1,26 @@
 const { generateReadme } = require('../../src/generator/readmeGenerator');
-const axios = require('axios');
 
-jest.mock('axios');
+jest.mock('axios-retry', () => jest.fn());
+
+const axios = require('axios');
+jest.mock('axios', () => {
+  const mockPost = jest.fn();
+  const mockClient = {
+    post: mockPost,
+    interceptors: {
+      request: { use: jest.fn(), eject: jest.fn() },
+      response: { use: jest.fn(), eject: jest.fn() },
+    },
+  };
+  return {
+    post: mockPost,
+    create: jest.fn(() => mockClient),
+    interceptors: {
+      request: { use: jest.fn(), eject: jest.fn() },
+      response: { use: jest.fn(), eject: jest.fn() },
+    },
+  };
+});
 
 describe('E2E: generateReadme', () => {
   beforeEach(() => {
@@ -77,7 +96,8 @@ describe('E2E: generateReadme', () => {
     expect(result.markdown).toContain('Описание');
     expect(result.markdown).toContain('Стек технологий');
     expect(result.markdown).toContain('Apache 2.0');
-    expect(axios.post).toHaveBeenCalled();  });
+    expect(axios.post).toHaveBeenCalled();
+  });
 
   test('должен падать в локальный режим, если AI вернул ошибку', async () => {
     axios.post.mockRejectedValue(new Error('AI Service Down'));

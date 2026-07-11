@@ -7,6 +7,32 @@ const AdmZip = require('adm-zip');
 const simpleGit = require('simple-git');
 const { rimraf } = require('rimraf');
 
+/**
+ * Нормализует GitHub URL в формат, пригодный для git clone.
+ * Преобразует веб-URL страниц репозитория (с query-параметрами, /tree/, /blob/ и т.д.)
+ * в чистый URL для клонирования.
+ * Примеры:
+ *   https://github.com/user/repo?tab=readme-ov-file → https://github.com/user/repo.git
+ *   https://github.com/user/repo/tree/main/src      → https://github.com/user/repo.git
+ */
+function normalizeGitHubUrl(url) {
+  if (!url) return url;
+  // Удаляем query-параметры и хэш
+  let clean = url.split('?')[0].split('#')[0];
+  // Удаляем трейлинг-слэш
+  clean = clean.replace(/\/$/, '');
+  // Если URL содержит /tree/, /blob/, /releases/ и т.п. — обрезаем до user/repo
+  const match = clean.match(/^(https?:\/\/github\.com\/[^\/]+\/[^\/]+)/);
+  if (match) {
+    clean = match[1];
+  }
+  // Добавляем .git если ещё нет
+  if (!clean.endsWith('.git')) {
+    clean += '.git';
+  }
+  return clean;
+}
+
 // Импортируем существующие модули из src
 const { scanProject } = require('../src/scanner/projectScanner');
 const { findMainFile } = require('../src/scanner/entryDetector');
@@ -50,8 +76,9 @@ class GenerateService {
 
       // 1. Get source code
       if (githubUrl) {
-        onProgress({ step: 'download', message: `Cloning repository: ${githubUrl}...` });
-        await simpleGit().clone(githubUrl, projectDir, ['--depth', '1']);
+        const normalizedUrl = normalizeGitHubUrl(githubUrl);
+        onProgress({ step: 'download', message: `Cloning repository: ${normalizedUrl}...` });
+        await simpleGit().clone(normalizedUrl, projectDir, ['--depth', '1']);
       } else if (zipFile) {
         onProgress({ step: 'download', message: 'Extracting archive...' });
         const zip = new AdmZip(zipFile.path);

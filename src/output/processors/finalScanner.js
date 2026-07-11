@@ -131,6 +131,12 @@ function shouldTranslate(text, targetLang) {
 
   // Если доминирующая письменность текста совпадает с целевым языком — не переводим
   if (dominantScript && targetScript && dominantScript === targetScript) {
+    // Особый случай: латиница — английский vs другие латинские языки
+    // В tech-проектах текст на латинице почти всегда на английском,
+    // поэтому если цель — другой латинский язык (fr, es, de...) — переводим
+    if (dominantScript === 'latin' && targetLang !== 'en') {
+      return true;
+    }
     return false;
   }
 

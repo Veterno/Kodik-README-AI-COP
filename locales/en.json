@@ -11,6 +11,16 @@
     "opt_api_key": "API key",
     "opt_output": "Directory to save README.md",
     "opt_dry_run": "Show result without saving",
+    "opt_tone": "Description tone (technical, marketing, minimal)",
+    "opt_language": "Language for translation",
+    "opt_target_language": "Target language for final README",
+    "opt_no_translate": "Disable final translation",
+    "opt_config": "Path to configuration file (JSON/YAML)",
+    "opt_validate": "Run validation after generation",
+    "opt_fix": "Automatically fix errors in README (requires --validate)",
+    "opt_project_name": "Explicit project name (overrides package.json)",
+    "opt_version": "Show version",
+    "opt_help": "Show help",
     "step_scan": "Step 1/6. Scanning project…",
     "step_manifest": "Step 2/6. Processing manifest and license…",
     "step_main_file": "Step 3/6. Looking for main source file…",
@@ -27,10 +37,72 @@
     "local_mode": "Using local AI provider (Ollama/LM Studio).",
     "cloud_mode": "Using cloud AI provider (OpenAI/DeepSeek/Groq).",
     "missing_key": "⚠️ API key not found or contains placeholder. Running in local mode (no AI).",
-    "disabled": "ℹ️ AI generation disabled. Running in local mode."
+    "disabled": "ℹ️ AI generation disabled. Running in local mode.",
+    "hint_set_key": "Set OPENAI_API_KEY environment variable or use --api-key flag."
+  },
+  "scan": {
+    "manifests_found": "Found manifests: {{count}} ({{list}})",
+    "manifests_not_found": "Manifests not found — continuing without them.",
+    "project_name": "Project name: {{name}}",
+    "license_found": "License detected: {{license}}",
+    "main_file_found": "Main file found: {{name}}",
+    "main_file_not_found": "Main file not found — continuing without it."
+  },
+  "interactive": {
+    "done": "Survey completed.",
+    "non_interactive": "--non-interactive mode: using values from CLI/config/defaults.",
+    "error": "Survey error: {{msg}}. Using defaults."
+  },
+  "context": {
+    "collected": "Business context and code context collected.",
+    "error": "Context collection error: {{msg}}. Continuing with limited context."
+  },
+  "generate": {
+    "stack": "Stack: {{stack}}",
+    "done": "README generated.",
+    "error": "README generation error: {{msg}}"
+  },
+  "final": {
+    "processing": "Final processing (translating to {{lang}})...",
+    "error": "Final scanner error: {{msg}}"
+  },
+  "save": {
+    "dry_run_header": "--- DRY RUN: README.md content ---",
+    "dry_run_footer": "--- END ---",
+    "fix_check": "Checking and auto-fixing README...",
+    "backup_created": "Backup created: {{path}}",
+    "fixes_applied": "Fixes applied: {{count}}",
+    "fixes_not_needed": "No fixes required.",
+    "saving": "Saving README.md...",
+    "saved": "README.md successfully created: {{path}}",
+    "save_error": "Failed to save README.md: {{msg}}"
+  },
+  "validate": {
+    "plugin_errors": "Plugin errors:",
+    "running": "Running validation of generated README...",
+    "header": "--- Validation results ---",
+    "accuracy": "Accuracy: {{score}}/10",
+    "clarity": "Clarity: {{score}}/10",
+    "completeness": "Completeness: {{score}}/10",
+    "hallucinations": "Hallucinations: {{score}}/10",
+    "local_errors": "Local errors: {{count}}",
+    "local_warnings": "Local warnings: {{count}}",
+    "feedback": "Feedback: {{text}}",
+    "separator": "----------------------------",
+    "error": "Validation failed: {{msg}}"
   },
   "errors": {
     "critical": "Critical error: {{msg}}",
-    "config_missing_key": "Configuration error: API key not found."
+    "config_missing_key": "Configuration error: API key not found.",
+    "unhandled_rejection": "Critical error: Unhandled Promise rejection",
+    "uncaught_exception": "Critical error: Uncaught exception",
+    "network_error": "Network error: Could not connect to AI service.",
+    "model_not_found": "AI error: Specified model not found.",
+    "auth_error": "Authorization error: Invalid API key.",
+    "hint_env": "Hint: Create .env file and add OPENAI_API_KEY=your_key or use --api-key flag.",
+    "hint_network": "Hint: Check internet connection and OPENAI_BASE_URL.",
+    "hint_model": "Hint: Check model name in --model or OPENAI_MODEL.",
+    "hint_auth": "Hint: Make sure OPENAI_API_KEY is correct.",
+    "debug_hint": "Run with DEBUG=true for more details"
   }
 }

@@ -32,19 +32,23 @@ class AiClient {
       }
     });
 
-    axiosRetry(this.client, {
-      retries: this.maxRetries,
-      retryDelay: (retryCount) => {
-        const delay = Math.pow(2, retryCount) * 1000;
-        log.warn(`Повторная попытка запроса к AI (${retryCount}/${this.maxRetries}) через ${delay}ms...`);
-        return delay;
-      },
-      retryCondition: (error) => {
-        // Повторяем только при сетевых ошибках или 5xx
-        return axiosRetry.isNetworkOrIdempotentRequestError(error) || 
-               (error.response && error.response.status >= 500);
-      }
-    });
+    if (this.maxRetries > 0) {
+      axiosRetry(this.client, {
+        retries: this.maxRetries,
+        retryDelay: (retryCount) => {
+          // retryCount начинается с 1 для первой попытки переспроса
+          const delay = Math.pow(2, retryCount - 1) * 1000;
+          log.warn(`Повторная попытка запроса к AI (${retryCount}/${this.maxRetries}) через ${delay}ms...`);
+          return delay;
+        },
+        retryCondition: (error) => {
+          // Повторяем только при сетевых ошибках или 5xx
+          return axiosRetry.isNetworkOrIdempotentRequestError(error) || 
+                 (error.response && error.response.status >= 500);
+        }
+      });
+    }
+
   }
   /**
    * Определяет провайдера по URL для применения специфичных адаптаций.
@@ -96,7 +100,7 @@ class AiClient {
       temperature = this.temperature
     } = options;
 
-    const useResponseFormat = json && AI_CONFIG.USE_RESPONSE_FORMAT && this.provider !== 'ollama';
+    const useResponseFormat = json && AI_CONFIG.USE_RESPONSE_FORMAT && this.provider !== 'ollama' && this.provider !== 'local';
 
     try {
       // Проверка API-ключа

@@ -24,7 +24,8 @@ describe('AiClient', () => {
     axios.create.mockReturnValue(mockAxiosInstance);
     axios.post = mockAxiosInstance.post;
 
-    client = new AiClient({ apiKey: 'test', model: 'gpt-4' });    // Переопределяем таймауты и ретраи для ускорения тестов
+    client = new AiClient({ provider: 'openai', apiKey: 'test', model: 'gpt-4' });
+    // Переопределяем таймауты и ретраи для ускорения тестов
     client.timeout = 100;
     client.maxRetries = 1;
   });

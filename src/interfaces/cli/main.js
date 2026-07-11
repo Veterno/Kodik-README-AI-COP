@@ -83,38 +83,38 @@ async function main(customArgv) {
       type: 'boolean'
     })
     .option('tone', {
-      describe: 'Тон описания',
+      describe: t('cli.opt_tone'),
       choices: ['technical', 'marketing', 'minimal'],
       type: 'string'
     })
     .option('l', {
       alias: 'language',
-      describe: 'Язык для перевода',
+      describe: t('cli.opt_language'),
       type: 'string'
     })
     .option('target-language', {
-      describe: 'Целевой язык итогового README',
+      describe: t('cli.opt_target_language'),
       type: 'string'
     })
     .option('no-translate', {
-      describe: 'Отключить финальный перевод',
+      describe: t('cli.opt_no_translate'),
       type: 'boolean'
     })
     .option('c', {
       alias: 'config',
-      describe: 'Путь к файлу конфигурации (JSON/YAML)',
+      describe: t('cli.opt_config'),
       type: 'string'
     })
     .option('validate', {
-      describe: 'Запустить валидацию после генерации',
+      describe: t('cli.opt_validate'),
       type: 'boolean'
     })
     .option('fix', {
-      describe: 'Автоматически исправлять ошибки в README (требует --validate)',
+      describe: t('cli.opt_fix'),
       type: 'boolean'
     })
     .option('projectName', {
-      describe: 'Явное название проекта (переопределяет package.json)',
+      describe: t('cli.opt_project_name'),
       type: 'string'
     })
     .option('prompt-version', {
@@ -166,13 +166,15 @@ async function main(customArgv) {
       type: 'boolean'
     })
     .command(require('../../commands/plugin'))
-    .command(require('../../commands/template'))    .help('h')    .alias('h', 'help')
-    .version('v', 'Показать версию', pkg.version)
+    .command(require('../../commands/template'))
+    .help('h', t('cli.opt_help'))
+    .alias('h', 'help')
+    .version('v', t('cli.opt_version'), pkg.version)
     .alias('v', 'version')
     .wrap(null)
     .argv;
 
-  console.log('\n\x1b[1m\x1b[35m📝 Kodik README AI\x1b[0m — автоматический генератор README.md\n');
+  console.log('\n\x1b[1m\x1b[35m' + t('cli.welcome') + '\x1b[0m\n');
 
   const options = resolveOptions(argv);
 
@@ -182,37 +184,37 @@ async function main(customArgv) {
   if (argv.ai !== false) {
     if (!options.ai.enabled) {
       if (options.ai.disabledReason === 'MISSING_KEY') {
-        log.warn('⚠️  API-ключ не найден или содержит плейсхолдер. Работаем в локальном режиме (без AI).');
-        console.log('   Чтобы использовать AI, укажите валидный OPENAI_API_KEY в .env или через --api-key.\n');
+        log.warn(t('ai.missing_key'));
+          console.log(`   ${t('ai.hint_set_key')}\n`);
       } else {
-        log.info('ℹ️  AI-генерация отключена. Работаем в локальном режиме.');
+        log.info(t('ai.disabled'));
       }
     } else {
       const isLocalAI = options.ai.apiUrl?.includes('localhost') || options.ai.apiUrl?.includes('127.0.0.1') || options.ai.apiKey === 'ollama';
       if (isLocalAI) {
-        log.info('🤖 Используется локальный AI-провайдер (Ollama/LM Studio).');
+        log.info(t('ai.local_mode'));
       } else {
-        log.info('🌐 Используется облачный AI-провайдер (OpenAI/DeepSeek/Groq).');
+        log.info(t('ai.cloud_mode'));
       }
     }
   }
   const targetDir = options.target;
   if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
-    log.error(`Указанная папка не существует или не является директорией: ${targetDir}`);
+    log.error(t('cli.scan_error_dir', { path: targetDir }));
     process.exit(1);
   }
 
-  log.info(`Целевая папка: ${targetDir}`);
-  if (options.dryRun) log.warn('Режим DRY RUN: файл не будет сохранен.');
+  log.info(t('cli.target_dir', { path: targetDir }));
+  if (options.dryRun) log.warn(t('cli.dry_run_warn'));
 
   // 1. Единое сканирование
-  log.step('Шаг 1/6. Сканирую проект…');
+  log.step(t('cli.step_scan'));
   await pluginManager.runHook('beforeScan');
   const scanResult = scanProject(targetDir, options.scanner);
   const { tree, flatFiles, manifests, detectedLicense: scannedLicense, docs, codeContext } = scanResult;
   await pluginManager.runHook('afterScan', { projectData: scanResult });
-  log.ok('Сканирование завершено.');  // 2. Манифест и Лицензия
-  log.step('Шаг 2/6. Обрабатываю манифест и лицензию…');
+  log.ok(t('cli.scan_ok'));  // 2. Манифест и Лицензия
+  log.step(t('cli.step_manifest'));
   
   /**
    * Определение названия проекта (Приоритет: CLI > package.json > имя папки)
@@ -239,15 +241,15 @@ async function main(customArgv) {
   }
 
   if (manifests.length > 0) {
-    log.ok(`Найдено манифестов: ${manifests.length} (${manifests.map(m => m.name).join(', ')})`);
+    log.ok(t('scan.manifests_found', { count: manifests.length, list: manifests.map(m => m.name).join(', ') }));
   } else {
-    log.warn('Манифесты не найдены — продолжаю без них.');
+    log.warn(t('scan.manifests_not_found'));
   }
 
-  log.info(`Название проекта: ${projectName}`);
+  log.info(t('scan.project_name', { name: projectName }));
 
   const detectedLicense = scannedLicense;
-  if (detectedLicense) log.ok(`Обнаружена лицензия: ${detectedLicense}`);
+  if (detectedLicense) log.ok(t('scan.license_found', { license: detectedLicense }));
 
   // 3. Главный файл
   log.step('Шаг 3/6. Ищу главный файл исходного кода…');

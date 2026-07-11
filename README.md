@@ -175,7 +175,7 @@ LOG_LEVEL=info
   "nonInteractive": true,
   "ai": {
     "enabled": true,
-"model": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
     "apiUrl": "https://api.openai.com/v1"
   },
   "content": {

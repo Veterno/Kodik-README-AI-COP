@@ -137,7 +137,9 @@ module.exports = {
   DOCS_FILES,
   DEFAULT_SECTIONS,
   DEFAULT_EMOJIS,
-  SENSITIVE_PATTERNS,  AI_CONFIG: {    RETRY_ATTEMPTS: parseInt(process.env.AI_RETRY_ATTEMPTS || '3', 10),
+  SENSITIVE_PATTERNS,
+  AI_CONFIG: {
+    RETRY_ATTEMPTS: parseInt(process.env.AI_RETRY_ATTEMPTS || '3', 10),
     TIMEOUT: parseInt(process.env.AI_TIMEOUT || '60000', 10),
     USE_RESPONSE_FORMAT: process.env.AI_USE_RESPONSE_FORMAT !== 'false',
     DEFAULT_TEMPERATURE: 0.7,

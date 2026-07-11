@@ -1,7 +1,7 @@
 /**
  * Плагин для добавления раздела с авторами в конец README.md
  */
-export default {
+module.exports = {
   name: 'kodik-authors-plugin',
   version: '1.0.0',
   
